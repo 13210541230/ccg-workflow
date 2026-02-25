@@ -23,12 +23,12 @@ function findPackageRoot(startDir: string): string {
 
 const PACKAGE_ROOT = findPackageRoot(__dirname)
 
-// All available commands (20 total after adding spec commands)
+// All available commands (27 total)
 const ALL_COMMANDS = [
   'workflow', // 完整6阶段开发工作流
   'plan', // 多模型协作规划（Phase 1-2）
   'execute', // 多模型协作执行（Phase 3-5）
-  'frontend', // 前端专项（Gemini主导）
+  'frontend', // 前端专项（Codex主导）
   'backend', // 后端专项（Codex主导）
   'feat', // 智能功能开发
   'analyze', // 技术分析
@@ -36,6 +36,7 @@ const ALL_COMMANDS = [
   'optimize', // 性能优化
   'test', // 测试生成
   'review', // 代码审查
+  'enhance', // Prompt 增强
   'init', // 初始化 CLAUDE.md
   'commit', // Git 智能提交
   'rollback', // Git 回滚
@@ -47,9 +48,10 @@ const ALL_COMMANDS = [
   'spec-impl', // 多模型协作实现
   'spec-review', // 归档前多模型审查
   'team-research', // Agent Teams 需求研究（并行探索 → 约束集）
-  'team-plan', // Agent Teams 规划（Lead 调 Codex/Gemini 产出并行计划）
+  'team-plan', // Agent Teams 规划（Lead 调 Codex 产出并行计划）
   'team-exec', // Agent Teams 并行实施（spawn Builders 并行写代码）
   'team-review', // Agent Teams 审查（双模型交叉审查并行产出）
+  'manage', // 主Agent调度模式（自动化编排 + 状态管理 + 多维审查）
 ] as const
 
 // Workflow configurations (for compatibility with existing code)
@@ -95,8 +97,8 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     commands: ['frontend'],
     defaultSelected: true,
     order: 2,
-    description: '前端专项任务（Gemini主导，更快更精准）',
-    descriptionEn: 'Frontend tasks (Gemini-led, faster)',
+    description: '前端专项任务（Codex主导）',
+    descriptionEn: 'Frontend tasks (Codex-led)',
   },
   {
     id: 'backend',
@@ -314,9 +316,9 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     category: 'development',
     commands: ['team-plan'],
     defaultSelected: true,
-    order: 2,
-    description: 'Lead 调用 Codex/Gemini 并行分析，产出零决策并行实施计划',
-    descriptionEn: 'Lead orchestrates Codex/Gemini analysis, produces zero-decision parallel plan',
+    order: 2.1,
+    description: 'Lead 调用 Codex 并行分析，产出零决策并行实施计划',
+    descriptionEn: 'Lead orchestrates Codex analysis, produces zero-decision parallel plan',
   },
   {
     id: 'team-exec',
@@ -336,9 +338,20 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     category: 'development',
     commands: ['team-review'],
     defaultSelected: true,
-    order: 3,
+    order: 3.1,
     description: '双模型交叉审查并行实施产出，分级处理 Critical/Warning/Info',
     descriptionEn: 'Dual-model cross-review with severity classification',
+  },
+  {
+    id: 'manage',
+    name: '主Agent调度',
+    nameEn: 'Agent Orchestration',
+    category: 'development',
+    commands: ['manage'],
+    defaultSelected: true,
+    order: 0.5,
+    description: '主Agent调度模式：自动化任务编排 + 状态管理 + 多维审查',
+    descriptionEn: 'Main agent orchestration with automated task dispatch and state management',
   },
 ]
 
@@ -366,8 +379,8 @@ export const WORKFLOW_PRESETS = {
   full: {
     name: '完整',
     nameEn: 'Full',
-    description: '全部命令（21个）',
-    descriptionEn: 'All commands (21)',
+    description: '全部命令（27个）',
+    descriptionEn: 'All commands (27)',
     workflows: WORKFLOW_CONFIGS.map(w => w.id),
   },
 }
@@ -399,8 +412,8 @@ function injectConfigVariables(content: string, config: {
   const routing = config.routing || {}
 
   // Frontend models
-  const frontendModels = routing.frontend?.models || ['gemini']
-  const frontendPrimary = routing.frontend?.primary || 'gemini'
+  const frontendModels = routing.frontend?.models || ['codex']
+  const frontendPrimary = routing.frontend?.primary || 'codex'
   processed = processed.replace(/\{\{FRONTEND_MODELS\}\}/g, JSON.stringify(frontendModels))
   processed = processed.replace(/\{\{FRONTEND_PRIMARY\}\}/g, frontendPrimary)
 
@@ -411,7 +424,7 @@ function injectConfigVariables(content: string, config: {
   processed = processed.replace(/\{\{BACKEND_PRIMARY\}\}/g, backendPrimary)
 
   // Review models
-  const reviewModels = routing.review?.models || ['codex', 'gemini']
+  const reviewModels = routing.review?.models || ['codex', 'codex']
   processed = processed.replace(/\{\{REVIEW_MODELS\}\}/g, JSON.stringify(reviewModels))
 
   // Routing mode
@@ -499,10 +512,10 @@ function replaceHomePathsInTemplate(content: string, installDir: string): string
   // 1. Replace ~/.claude/.ccg with absolute path (longest match first)
   processed = processed.replace(/~\/\.claude\/\.ccg/g, normalizePath(ccgDir))
 
-  // 2. Replace ~/.claude/bin/codeagent-wrapper with absolute path + .exe on Windows
-  //    CRITICAL: Windows Git Bash requires explicit .exe extension
-  const wrapperName = isWindows() ? 'codeagent-wrapper.exe' : 'codeagent-wrapper'
-  const wrapperPath = `${normalizePath(binDir)}/${wrapperName}`
+  // 2. Replace ~/.claude/bin/codeagent-wrapper with persist wrapper script path
+  //    codeagent-persist.sh tees output to ~/.claude/.ccg/outputs/ as fallback
+  //    for Claude Code TaskOutput temp file loss (race condition with parallel tasks)
+  const wrapperPath = `${normalizePath(binDir)}/codeagent-persist.sh`
   processed = processed.replace(/~\/\.claude\/bin\/codeagent-wrapper/g, wrapperPath)
 
   // 3. Replace ~/.claude/bin with absolute path (for other binaries)
@@ -536,9 +549,9 @@ export async function installWorkflows(
   const installConfig = {
     routing: config?.routing || {
       mode: 'smart',
-      frontend: { models: ['gemini'], primary: 'gemini' },
+      frontend: { models: ['codex'], primary: 'codex' },
       backend: { models: ['codex'], primary: 'codex' },
-      review: { models: ['codex', 'gemini'] },
+      review: { models: ['codex', 'codex'] },
     },
     liteMode: config?.liteMode || false,
     mcpProvider: config?.mcpProvider || 'ace-tool',
@@ -746,6 +759,21 @@ ${workflow.description}
       catch (verifyError) {
         result.errors.push(`Binary verification failed: ${verifyError}`)
         result.success = false
+      }
+
+      // Install codeagent-persist.sh wrapper (tees output to persistent file)
+      try {
+        const persistSrc = join(PACKAGE_ROOT, 'templates', 'bin', 'codeagent-persist.sh')
+        const persistDest = join(binDir, 'codeagent-persist.sh')
+        if (await fs.pathExists(persistSrc)) {
+          await fs.copy(persistSrc, persistDest)
+          if (platform !== 'win32') {
+            await fs.chmod(persistDest, 0o755)
+          }
+        }
+      }
+      catch {
+        // Non-fatal: persist wrapper is optional
       }
     }
     else {
