@@ -1,45 +1,24 @@
 {
-  "scanTimestamp": "2026-01-07T13:47:55+08:00",
-  "version": "1.0.0",
-  "projectName": "skills-v2 (CCG Multi-Model Collaboration System)",
-  "projectPath": "/Users/li/Desktop/my_proce/codex_gemini_skills/skills-v2",
+  "scanTimestamp": "2026-02-25T18:24:44+08:00",
+  "version": "2.0.0",
+  "projectName": "ccg-workflow (CCG Multi-Model Collaboration System)",
+  "projectVersion": "1.7.61",
   "modules": [
-    {
-      "name": "codeagent-wrapper",
-      "path": "codeagent-wrapper/",
-      "language": "Go",
-      "type": "binary",
-      "entryPoints": [
-        "codeagent-wrapper/main.go"
-      ],
-      "description": "多后端调用工具（支持 codex/gemini/claude 切换）",
-      "keyFiles": [
-        "codeagent-wrapper/main.go",
-        "codeagent-wrapper/backend.go",
-        "codeagent-wrapper/executor.go",
-        "codeagent-wrapper/logger.go",
-        "codeagent-wrapper/parser.go",
-        "codeagent-wrapper/config.go"
-      ],
-      "testFiles": [
-        "codeagent-wrapper/*_test.go"
-      ],
-      "configFiles": [],
-      "coverage": "high"
-    },
     {
       "name": "cli-tool",
       "path": "src/",
       "language": "TypeScript",
       "type": "application",
+      "description": "CCG CLI 工具（交互式安装、配置、更新、诊断、菜单）",
+      "claudeMd": "src/CLAUDE.md",
       "entryPoints": [
         "src/cli.ts",
         "src/index.ts"
       ],
-      "description": "CCG CLI 工具（交互式安装、配置、更新、诊断）",
       "keyFiles": [
         "src/cli.ts",
         "src/cli-setup.ts",
+        "src/index.ts",
         "src/commands/init.ts",
         "src/commands/update.ts",
         "src/commands/menu.ts",
@@ -48,9 +27,12 @@
         "src/utils/installer.ts",
         "src/utils/config.ts",
         "src/utils/mcp.ts",
-        "src/utils/migration.ts",
         "src/utils/platform.ts",
-        "src/i18n/index.ts"
+        "src/utils/version.ts",
+        "src/utils/migration.ts",
+        "src/i18n/index.ts",
+        "src/types/index.ts",
+        "src/types/cli.ts"
       ],
       "testFiles": [],
       "configFiles": [
@@ -62,57 +44,109 @@
         {
           "type": "CLI",
           "commands": [
+            "npx ccg-workflow",
             "npx ccg-workflow init",
-            "npx ccg-workflow update",
             "npx ccg-workflow menu",
-            "npx ccg diagnose-mcp",
-            "npx ccg config mcp"
+            "npx ccg-workflow update",
+            "npx ccg-workflow diagnose-mcp",
+            "npx ccg-workflow fix-mcp",
+            "npx ccg-workflow config mcp"
           ]
         }
       ],
       "dependencies": {
-        "runtime": [
-          "cac",
-          "inquirer",
-          "ora",
-          "ansis",
-          "fs-extra",
-          "i18next",
-          "smol-toml"
-        ],
-        "dev": [
-          "typescript",
-          "unbuild",
-          "tsx",
-          "@antfu/eslint-config"
-        ]
+        "runtime": ["cac", "inquirer", "ora", "ansis", "fs-extra", "smol-toml", "i18next", "i18next-fs-backend", "pathe"],
+        "dev": ["typescript", "unbuild", "tsx", "@antfu/eslint-config", "eslint"]
       },
-      "coverage": "high"
+      "coverage": "high",
+      "gaps": ["暂无自动化测试"]
+    },
+    {
+      "name": "codeagent-wrapper",
+      "path": "codeagent-wrapper/",
+      "language": "Go",
+      "type": "binary",
+      "description": "多后端调用工具（codex/gemini/claude），支持并行任务、Web UI 流、输出持久化",
+      "claudeMd": "codeagent-wrapper/CLAUDE.md",
+      "entryPoints": [
+        "codeagent-wrapper/main.go"
+      ],
+      "keyFiles": [
+        "codeagent-wrapper/main.go",
+        "codeagent-wrapper/config.go",
+        "codeagent-wrapper/backend.go",
+        "codeagent-wrapper/executor.go",
+        "codeagent-wrapper/parser.go",
+        "codeagent-wrapper/logger.go",
+        "codeagent-wrapper/server.go",
+        "codeagent-wrapper/filter.go",
+        "codeagent-wrapper/utils.go",
+        "codeagent-wrapper/persist.go",
+        "codeagent-wrapper/wrapper_name.go",
+        "codeagent-wrapper/process_check_windows.go",
+        "codeagent-wrapper/process_check_unix.go",
+        "codeagent-wrapper/windows_console.go",
+        "codeagent-wrapper/windows_console_unix.go"
+      ],
+      "testFiles": [
+        "codeagent-wrapper/main_test.go",
+        "codeagent-wrapper/main_integration_test.go",
+        "codeagent-wrapper/backend_test.go",
+        "codeagent-wrapper/executor_concurrent_test.go",
+        "codeagent-wrapper/concurrent_stress_test.go",
+        "codeagent-wrapper/filter_test.go",
+        "codeagent-wrapper/logger_test.go",
+        "codeagent-wrapper/logger_additional_coverage_test.go",
+        "codeagent-wrapper/logger_suffix_test.go",
+        "codeagent-wrapper/log_writer_limit_test.go",
+        "codeagent-wrapper/parser_token_too_long_test.go",
+        "codeagent-wrapper/parser_unknown_event_test.go",
+        "codeagent-wrapper/utils_test.go",
+        "codeagent-wrapper/bench_test.go",
+        "codeagent-wrapper/path_normalization_test.go",
+        "codeagent-wrapper/process_check_test.go",
+        "codeagent-wrapper/wrapper_name_test.go"
+      ],
+      "configFiles": [
+        "codeagent-wrapper/go.mod"
+      ],
+      "coverage": "high",
+      "gaps": []
     },
     {
       "name": "command-templates",
       "path": "templates/commands/",
       "language": "Markdown",
       "type": "templates",
-      "description": "17 个斜杠命令模板（/ccg:xxx 格式）",
+      "description": "26 个斜杠命令模板 + 4 个子智能体（/ccg:xxx 格式）",
+      "claudeMd": "templates/CLAUDE.md",
       "keyFiles": [
-        "templates/commands/dev.md",
-        "templates/commands/code.md",
+        "templates/commands/workflow.md",
+        "templates/commands/plan.md",
+        "templates/commands/execute.md",
         "templates/commands/frontend.md",
         "templates/commands/backend.md",
-        "templates/commands/debug.md",
-        "templates/commands/test.md",
-        "templates/commands/bugfix.md",
-        "templates/commands/optimize.md",
-        "templates/commands/think.md",
-        "templates/commands/analyze.md",
-        "templates/commands/review.md",
         "templates/commands/feat.md",
+        "templates/commands/analyze.md",
+        "templates/commands/debug.md",
+        "templates/commands/optimize.md",
+        "templates/commands/test.md",
+        "templates/commands/review.md",
+        "templates/commands/enhance.md",
+        "templates/commands/init.md",
         "templates/commands/commit.md",
         "templates/commands/rollback.md",
         "templates/commands/clean-branches.md",
         "templates/commands/worktree.md",
-        "templates/commands/init.md"
+        "templates/commands/spec-init.md",
+        "templates/commands/spec-research.md",
+        "templates/commands/spec-plan.md",
+        "templates/commands/spec-impl.md",
+        "templates/commands/spec-review.md",
+        "templates/commands/team-research.md",
+        "templates/commands/team-plan.md",
+        "templates/commands/team-exec.md",
+        "templates/commands/team-review.md"
       ],
       "submodules": [
         {
@@ -127,82 +161,142 @@
           ]
         }
       ],
-      "coverage": "complete"
+      "coverage": "complete",
+      "gaps": []
     },
     {
       "name": "expert-prompts",
       "path": "templates/prompts/",
       "language": "Markdown",
       "type": "prompts",
-      "description": "12 个专家提示词（Codex 6 + Gemini 6）",
+      "description": "19 个专家提示词（Codex 6 + Gemini 7 + Claude 6）",
       "keyFiles": [
-        "templates/prompts/codex/architect.md",
         "templates/prompts/codex/analyzer.md",
+        "templates/prompts/codex/architect.md",
         "templates/prompts/codex/debugger.md",
         "templates/prompts/codex/optimizer.md",
         "templates/prompts/codex/reviewer.md",
         "templates/prompts/codex/tester.md",
-        "templates/prompts/gemini/frontend.md",
         "templates/prompts/gemini/analyzer.md",
+        "templates/prompts/gemini/architect.md",
         "templates/prompts/gemini/debugger.md",
+        "templates/prompts/gemini/frontend.md",
         "templates/prompts/gemini/optimizer.md",
         "templates/prompts/gemini/reviewer.md",
-        "templates/prompts/gemini/tester.md"
+        "templates/prompts/gemini/tester.md",
+        "templates/prompts/claude/analyzer.md",
+        "templates/prompts/claude/architect.md",
+        "templates/prompts/claude/debugger.md",
+        "templates/prompts/claude/optimizer.md",
+        "templates/prompts/claude/reviewer.md",
+        "templates/prompts/claude/tester.md"
       ],
-      "coverage": "complete"
+      "coverage": "complete",
+      "gaps": []
+    },
+    {
+      "name": "output-styles",
+      "path": "templates/output-styles/",
+      "language": "Markdown",
+      "type": "templates",
+      "description": "5 个可选输出风格（专业/猫娘/老王/大小姐/邪修）",
+      "keyFiles": [
+        "templates/output-styles/abyss-cultivator.md",
+        "templates/output-styles/engineer-professional.md",
+        "templates/output-styles/laowang-engineer.md",
+        "templates/output-styles/nekomata-engineer.md",
+        "templates/output-styles/ojousama-engineer.md"
+      ],
+      "coverage": "complete",
+      "gaps": []
     },
     {
       "name": "precompiled-binaries",
       "path": "bin/",
       "language": "Binary",
       "type": "artifacts",
-      "description": "预编译 codeagent-wrapper 二进制文件（跨平台）",
+      "description": "预编译 codeagent-wrapper 二进制文件（6 平台）+ CLI 入口脚本",
       "keyFiles": [
         "bin/ccg.mjs",
         "bin/codeagent-wrapper-darwin-amd64",
         "bin/codeagent-wrapper-darwin-arm64",
         "bin/codeagent-wrapper-linux-amd64",
-        "bin/codeagent-wrapper-windows-amd64.exe"
+        "bin/codeagent-wrapper-linux-arm64",
+        "bin/codeagent-wrapper-windows-amd64.exe",
+        "bin/codeagent-wrapper-windows-arm64.exe"
       ],
-      "coverage": "complete"
+      "coverage": "complete",
+      "gaps": []
     }
   ],
   "statistics": {
-    "totalModules": 5,
+    "totalModules": 6,
     "totalFiles": {
-      "go": 27,
-      "typescript": 16,
-      "markdown": 48,
-      "json": 5,
-      "binary": 5
+      "typescript": 17,
+      "go_source": 16,
+      "go_test": 16,
+      "command_templates": 26,
+      "agent_templates": 4,
+      "prompt_templates": 19,
+      "output_styles": 5,
+      "shell_scripts": 2,
+      "config_files": 7,
+      "binary": 7,
+      "root_markdown": 6
     },
-    "estimatedCoverage": "95%",
-    "commands": 17,
+    "estimatedCoverage": "98%",
+    "scannedFiles": 125,
+    "totalNonIgnoredFiles": 128,
+    "commands": 26,
     "agents": 4,
-    "prompts": 12
+    "prompts": 19,
+    "outputStyles": 5,
+    "goWrapperVersion": "5.7.2",
+    "npmPackageVersion": "1.7.61"
   },
   "ignoreRules": {
     "source": ".gitignore",
     "patterns": [
       "node_modules/**",
       "dist/**",
-      "build/**",
       "__pycache__/**",
       "*.log",
-      "*.exe",
+      "*.exe (except bin/)",
       ".DS_Store",
       ".idea/**",
       ".vscode/**",
       "*.backup",
       "*.bak",
       ".ace-tool/**",
-      "pnpm-lock.yaml"
+      ".claude/**",
+      "pnpm-lock.yaml",
+      "ceshi/**",
+      ".spec-workflow/**",
+      "openspec/**",
+      "docs/**"
     ]
   },
-  "gaps": [],
+  "gaps": [
+    {
+      "module": "cli-tool",
+      "type": "missing-tests",
+      "description": "TypeScript CLI 模块暂无自动化测试文件",
+      "priority": "medium",
+      "suggestion": "建议为 installer.ts / config.ts / mcp.ts / version.ts 添加单元测试"
+    },
+    {
+      "module": "templates",
+      "type": "content-not-read",
+      "description": "26 个命令模板 .md 内容未逐一深度读取（仅验证文件存在）",
+      "priority": "low",
+      "suggestion": "如需分析命令模板内部结构，可对 templates/commands/*.md 进行深度扫描"
+    }
+  ],
   "nextSteps": [
-    "项目已全面扫描，覆盖率 95%+",
-    "建议补充：src/i18n/locales/ 国际化文件（如需深入分析多语言支持）",
-    "建议补充：dist/ 构建产物分析（运行 pnpm build 后）"
-  ]
+    "项目已全面扫描，覆盖率 98%+",
+    "建议优先补充：src/ 模块的单元测试",
+    "建议补充：templates/commands/*.md 内容深度分析（变量使用、codeagent-wrapper 调用模式）",
+    "可选：dist/ 构建产物分析（运行 pnpm build 后）"
+  ],
+  "truncated": false
 }
