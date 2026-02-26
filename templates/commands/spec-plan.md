@@ -10,7 +10,7 @@ description: '多模型分析 → 消除歧义 → 零决策可执行计划'
 
 **Guardrails**
 - Do not proceed to implementation until every ambiguity is resolved.
-- Multi-model collaboration is **mandatory**: use both Codex and Gemini.
+- Multi-model collaboration is **mandatory**: use Codex.
 - If constraints cannot be fully specified, escalate to user or return to research phase.
 - Refer to `openspec/config.yaml` for project conventions.
 
@@ -21,8 +21,8 @@ description: '多模型分析 → 消除歧义 → 零决策可执行计划'
    - Run `openspec status --change "<change_id>" --json` to review current state.
 
 2. **Multi-Model Implementation Analysis (PARALLEL)**
-   - **CRITICAL**: You MUST launch BOTH Codex AND Gemini in a SINGLE message with TWO Bash tool calls.
-   - **DO NOT** call one model first and wait. Launch BOTH simultaneously with `run_in_background: true`.
+   - **CRITICAL**: You MUST launch BOTH Codex instances in a SINGLE message with TWO Bash tool calls.
+   - **DO NOT** call one instance first and wait. Launch BOTH simultaneously with `run_in_background: true`.
    - **工作目录**：`{{WORKDIR}}` 替换为目标工作目录的绝对路径。如果用户通过 `/add-dir` 添加了多个工作区，先确定任务相关的工作区。
 
    **Step 2.1**: In ONE message, make TWO parallel Bash calls:
@@ -37,27 +37,29 @@ description: '多模型分析 → 消除歧义 → 零决策可执行计划'
    })
    ```
 
-   **SECOND Bash call (Gemini) - IN THE SAME MESSAGE**:
+   **SECOND Bash call (Codex) - IN THE SAME MESSAGE**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --backend gemini --gemini-model gemini-3-pro-preview - \"{{WORKDIR}}\" <<'EOF'\nAnalyze change <change_id> from frontend/integration perspective:\n- Maintainability assessment\n- Scalability considerations\n- Integration conflicts\nOUTPUT: JSON with analysis\nEOF",
+     command: "~/.claude/bin/codeagent-wrapper --backend codex - \"{{WORKDIR}}\" <<'EOF'\nAnalyze change <change_id> from architecture/design perspective:\n- Maintainability assessment\n- Scalability considerations\n- Integration conflicts\nOUTPUT: JSON with analysis\nEOF",
      run_in_background: true,
      timeout: 300000,
-     description: "Gemini: frontend analysis"
+     description: "Codex: architecture analysis"
    })
    ```
 
    **Step 2.2**: After BOTH Bash calls return task IDs, wait for results with TWO TaskOutput calls:
    ```
-   TaskOutput({ task_id: "<codex_task_id>", block: true, timeout: 600000 })
-   TaskOutput({ task_id: "<gemini_task_id>", block: true, timeout: 600000 })
+   TaskOutput({ task_id: "<codex_task_id_1>", block: true, timeout: 600000 })
+   TaskOutput({ task_id: "<codex_task_id_2>", block: true, timeout: 600000 })
    ```
+
+   **Output loss detection** (⚠️ mandatory): If `TaskOutput` returns `exit_code: 0` but `<output>` is empty, use `Read` tool to read the output file (path from `Output is being written to:`, use Windows absolute path format). If temp file is gone, use `Glob` to find `~/.claude/.ccg/outputs/*.txt` and read the latest. If still missing, re-run with `resume`. NEVER skip empty output.
 
    - Synthesize responses and present consolidated options to user.
 
 3. **Uncertainty Elimination Audit**
    - **Codex**: "Review proposal for unspecified decision points. List each as: [AMBIGUITY] → [REQUIRED CONSTRAINT]"
-   - **Gemini**: "Identify implicit assumptions. Specify: [ASSUMPTION] → [EXPLICIT CONSTRAINT NEEDED]"
+   - **Codex**: "Identify implicit assumptions. Specify: [ASSUMPTION] → [EXPLICIT CONSTRAINT NEEDED]"
 
    **Anti-Pattern Detection** (flag and reject):
    - Information collection without decision boundaries
@@ -73,7 +75,7 @@ description: '多模型分析 → 消除歧义 → 零决策可执行计划'
 
 4. **PBT Property Extraction**
    - **Codex**: "Extract PBT properties. For each requirement: [INVARIANT] → [FALSIFICATION STRATEGY]"
-   - **Gemini**: "Define system properties: [PROPERTY] | [DEFINITION] | [BOUNDARY CONDITIONS] | [COUNTEREXAMPLE GENERATION]"
+   - **Codex**: "Define system properties: [PROPERTY] | [DEFINITION] | [BOUNDARY CONDITIONS] | [COUNTEREXAMPLE GENERATION]"
 
    **Property Categories**:
    - **Commutativity/Associativity**: Order-independent operations

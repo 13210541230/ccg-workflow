@@ -83,6 +83,7 @@ func runStartupCleanup() {
 	if _, err := cleanupLogsFn(); err != nil {
 		logWarn(fmt.Sprintf("cleanupOldLogs error: %v", err))
 	}
+	cleanupOldPersistFiles()
 }
 
 func runCleanupMode() int {
@@ -311,7 +312,13 @@ func run() (exitCode int) {
 
 			// Default: summary mode (context-efficient)
 			// --full-output: legacy full output mode
-			fmt.Println(generateFinalOutputWithMode(results, !fullOutput))
+			parallelOut := generateFinalOutputWithMode(results, !fullOutput)
+			fmt.Println(parallelOut)
+
+			// Persist parallel output as fallback
+			if pp := persistOutput(parallelOut, "parallel"); pp != "" {
+				fmt.Fprintf(os.Stderr, "PERSIST_OUTPUT: %s\n", pp)
+			}
 
 			exitCode = 0
 			for _, res := range results {
@@ -482,6 +489,15 @@ func run() (exitCode int) {
 	fmt.Println(result.Message)
 	if result.SessionID != "" {
 		fmt.Printf("\n---\nSESSION_ID: %s\n", result.SessionID)
+	}
+
+	// Persist output to ~/.claude/.ccg/outputs/ as fallback for TaskOutput loss
+	fullOut := result.Message
+	if result.SessionID != "" {
+		fullOut += fmt.Sprintf("\n---\nSESSION_ID: %s\n", result.SessionID)
+	}
+	if pp := persistOutput(fullOut, cfg.Backend); pp != "" {
+		fmt.Fprintf(os.Stderr, "PERSIST_OUTPUT: %s\n", pp)
 	}
 
 	// CRITICAL: Windows-specific fix for Git Bash background process output capture

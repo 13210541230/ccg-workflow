@@ -10,7 +10,7 @@ description: 'Agent Teams 需求研究 - 并行探索代码库，产出约束集
 **Guardrails**
 - **STOP! BEFORE ANY OTHER ACTION**: 必须先做 Prompt 增强。
 - 按上下文边界（context boundaries）划分探索范围，不按角色划分。
-- 多模型协作是 **mandatory**：Codex（后端边界）+ Gemini（前端边界）。
+- 多模型协作是 **mandatory**：Codex（后端边界）+ Codex（架构视角）。
 - 不做架构决策——只发现约束。
 - 使用 `AskUserQuestion` 解决任何歧义，绝不假设。
 
@@ -46,21 +46,28 @@ description: 'Agent Teams 需求研究 - 并行探索代码库，产出约束集
    })
    ```
 
-   **SECOND Bash call (Gemini) - IN THE SAME MESSAGE**:
+   **SECOND Bash call (Codex) - IN THE SAME MESSAGE**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend gemini {{GEMINI_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/gemini/analyzer.md\n<TASK>\n需求：<增强后的需求>\n探索范围：前端相关上下文边界\n</TASK>\nOUTPUT (JSON):\n{\n  \"module_name\": \"探索的上下文边界\",\n  \"existing_structures\": [\"发现的关键模式\"],\n  \"existing_conventions\": [\"使用中的规范\"],\n  \"constraints_discovered\": [\"限制解决方案空间的硬约束\"],\n  \"open_questions\": [\"需要用户确认的歧义\"],\n  \"dependencies\": [\"跨模块依赖\"],\n  \"risks\": [\"潜在阻碍\"],\n  \"success_criteria_hints\": [\"可观测的成功行为\"]\n}\nEOF",
+     command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/codex/analyzer.md\n<TASK>\n需求：<增强后的需求>\n探索范围：架构设计相关上下文边界\n</TASK>\nOUTPUT (JSON):\n{\n  \"module_name\": \"探索的上下文边界\",\n  \"existing_structures\": [\"发现的关键模式\"],\n  \"existing_conventions\": [\"使用中的规范\"],\n  \"constraints_discovered\": [\"限制解决方案空间的硬约束\"],\n  \"open_questions\": [\"需要用户确认的歧义\"],\n  \"dependencies\": [\"跨模块依赖\"],\n  \"risks\": [\"潜在阻碍\"],\n  \"success_criteria_hints\": [\"可观测的成功行为\"]\n}\nEOF",
      run_in_background: true,
      timeout: 3600000,
-     description: "Gemini 前端探索"
+     description: "Codex 架构探索"
    })
    ```
 
    **等待结果**:
    ```
    TaskOutput({ task_id: "<codex_task_id>", block: true, timeout: 600000 })
-   TaskOutput({ task_id: "<gemini_task_id>", block: true, timeout: 600000 })
+   TaskOutput({ task_id: "<codex_task_id_2>", block: true, timeout: 600000 })
    ```
+
+   **输出丢失检测**（⚠️ 必须执行）：
+   - 每次 `TaskOutput` 返回后，**立即检查 `<output>` 部分是否为空或缺失**。
+   - 若输出为空但 `exit_code: 0`：先用 `Read` 工具读取输出文件（路径在启动时的 `Output is being written to:` 中，使用 Windows 绝对路径格式）。若临时文件已清理，用 `Glob` 查找 `~/.claude/.ccg/outputs/*.txt` 读取最新文件。若仍无，用相同命令重新调用（resume 复用会话）。
+   - **禁止**：跳过空输出继续下一阶段、用 `cat` 命令读文件。
+
+   **📌 保存 SESSION_ID**：从 Codex 输出中提取 `SESSION_ID`，分别保存为 `CODEX_RESEARCH_SESSION` 和 `CODEX_B_RESEARCH_SESSION`，供后续 `/ccg:team-plan` 复用。
 
 4. **聚合与综合**
    - 合并所有探索输出为统一约束集：
@@ -90,11 +97,11 @@ description: 'Agent Teams 需求研究 - 并行探索代码库，产出约束集
    ## 约束集
 
    ### 硬约束
-   - [HC-1] <约束描述> — 来源：<Codex/Gemini/用户>
+   - [HC-1] <约束描述> — 来源：<Codex/用户>
    - [HC-2] ...
 
    ### 软约束
-   - [SC-1] <约束描述> — 来源：<Codex/Gemini/用户>
+   - [SC-1] <约束描述> — 来源：<Codex/用户>
    - [SC-2] ...
 
    ### 依赖关系
@@ -109,14 +116,19 @@ description: 'Agent Teams 需求研究 - 并行探索代码库，产出约束集
 
    ## 开放问题（已解决）
    - Q1: <问题> → A: <用户回答> → 约束：[HC/SC-N]
+
+   ## Codex Sessions（供后续阶段复用）
+   - CODEX_RESEARCH_SESSION: <session_id>
+   - CODEX_B_RESEARCH_SESSION: <session_id>
    ```
 
 7. **上下文检查点**
    - 报告当前上下文使用量。
    - 提示：`研究完成，运行 /clear 后执行 /ccg:team-plan <任务名> 开始规划`
+   - 提醒用户：研究文件中已保存 Codex SESSION_ID，`/ccg:team-plan` 会自动复用以节省时间。
 
 **Exit Criteria**
-- [ ] Codex + Gemini 探索完成
+- [ ] Codex 探索完成（后端 + 架构两个维度）
 - [ ] 所有歧义已通过用户确认解决
 - [ ] 约束集 + 成功判据已写入研究文件
 - [ ] 零开放问题残留

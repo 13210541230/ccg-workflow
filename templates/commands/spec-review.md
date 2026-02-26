@@ -9,7 +9,7 @@ description: '双模型交叉审查（独立工具，随时可用）'
 - This is an independent review tool—can be used anytime, not tied to archive workflow.
 
 **Guardrails**
-- **MANDATORY**: Both Codex AND Gemini must complete review before synthesis.
+- **MANDATORY**: Both Codex reviews must complete before synthesis.
 - Review scope is strictly limited to the proposal's changes—no scope creep.
 - Refer to `openspec/AGENTS.md` for spec conventions if reviewing OpenSpec proposals.
 
@@ -25,8 +25,8 @@ description: '双模型交叉审查（独立工具，随时可用）'
    - Load relevant spec constraints and PBT properties from `openspec/changes/<id>/specs/`.
 
 3. **Multi-Model Review (PARALLEL)**
-   - **CRITICAL**: You MUST launch BOTH Codex AND Gemini in a SINGLE message with TWO Bash tool calls.
-   - **DO NOT** call one model first and wait. Launch BOTH simultaneously with `run_in_background: true`.
+   - **CRITICAL**: You MUST launch BOTH Codex instances in a SINGLE message with TWO Bash tool calls.
+   - **DO NOT** call one instance first and wait. Launch BOTH simultaneously with `run_in_background: true`.
    - **工作目录**：`{{WORKDIR}}` 替换为目标工作目录的绝对路径。如果用户通过 `/add-dir` 添加了多个工作区，先确定任务相关的工作区。
 
    **Step 3.1**: In ONE message, make TWO parallel Bash calls:
@@ -41,21 +41,23 @@ description: '双模型交叉审查（独立工具，随时可用）'
    })
    ```
 
-   **SECOND Bash call (Gemini) - IN THE SAME MESSAGE**:
+   **SECOND Bash call (Codex) - IN THE SAME MESSAGE**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --backend gemini - \"{{WORKDIR}}\" <<'EOF'\nReview proposal <proposal_id> implementation:\n\n## Gemini Review Dimensions\n1. **Pattern Consistency**: Naming conventions, code style, project patterns\n2. **Maintainability**: Readability, complexity, documentation adequacy\n3. **Integration Risk**: Dependency changes, cross-module impacts\n4. **Frontend Security**: XSS, CSRF, sensitive data exposure\n5. **Spec Alignment**: Implementation matches spec intent (not just letter)\n\n## Output Format (JSON)\n{\n  \"findings\": [\n    {\n      \"severity\": \"Critical|Warning|Info\",\n      \"dimension\": \"patterns|maintainability|integration|security|alignment\",\n      \"file\": \"path/to/file.ts\",\n      \"line\": 42,\n      \"description\": \"What is wrong\",\n      \"spec_reference\": \"Spec section (if applicable)\",\n      \"fix_suggestion\": \"How to fix\"\n    }\n  ],\n  \"passed_checks\": [\"List of verified aspects\"],\n  \"summary\": \"Overall assessment\"\n}\nEOF",
+     command: "~/.claude/bin/codeagent-wrapper --backend codex - \"{{WORKDIR}}\" <<'EOF'\nReview proposal <proposal_id> implementation:\n\n## Codex Architecture Review Dimensions\n1. **Pattern Consistency**: Naming conventions, code style, project patterns\n2. **Maintainability**: Readability, complexity, documentation adequacy\n3. **Integration Risk**: Dependency changes, cross-module impacts\n4. **Architecture Security**: XSS, CSRF, sensitive data exposure\n5. **Spec Alignment**: Implementation matches spec intent (not just letter)\n\n## Output Format (JSON)\n{\n  \"findings\": [\n    {\n      \"severity\": \"Critical|Warning|Info\",\n      \"dimension\": \"patterns|maintainability|integration|security|alignment\",\n      \"file\": \"path/to/file.ts\",\n      \"line\": 42,\n      \"description\": \"What is wrong\",\n      \"spec_reference\": \"Spec section (if applicable)\",\n      \"fix_suggestion\": \"How to fix\"\n    }\n  ],\n  \"passed_checks\": [\"List of verified aspects\"],\n  \"summary\": \"Overall assessment\"\n}\nEOF",
      run_in_background: true,
      timeout: 300000,
-     description: "Gemini: patterns/integration review"
+     description: "Codex: patterns/integration review"
    })
    ```
 
    **Step 3.2**: After BOTH Bash calls return task IDs, wait for results with TWO TaskOutput calls:
    ```
-   TaskOutput({ task_id: "<codex_task_id>", block: true, timeout: 600000 })
-   TaskOutput({ task_id: "<gemini_task_id>", block: true, timeout: 600000 })
+   TaskOutput({ task_id: "<codex_task_id_1>", block: true, timeout: 600000 })
+   TaskOutput({ task_id: "<codex_task_id_2>", block: true, timeout: 600000 })
    ```
+
+   **Output loss detection** (⚠️ mandatory): If `TaskOutput` returns `exit_code: 0` but `<output>` is empty, use `Read` tool to read the output file (path from `Output is being written to:`, use Windows absolute path format). If temp file is gone, use `Glob` to find `~/.claude/.ccg/outputs/*.txt` and read the latest. If still missing, re-run with `resume`. NEVER skip empty output.
 
 4. **Synthesize Findings**
    - Merge findings from both models.
@@ -97,7 +99,7 @@ description: '双模型交叉审查（独立工具，随时可用）'
 
 7. **Optional: Inline Fix Mode**
    - If user chooses "Fix now" for Critical issues:
-     * Route each fix to appropriate model (backend→Codex, frontend→Gemini).
+     * Route each fix to Codex.
      * Apply fix using unified diff patch pattern.
      * Re-run affected review dimension.
      * Repeat until Critical = 0.
@@ -108,7 +110,7 @@ description: '双模型交叉审查（独立工具，随时可用）'
 
 **Exit Criteria**
 Review is complete when:
-- [ ] Both Codex and Gemini reviews completed
+- [ ] Both Codex reviews completed
 - [ ] All findings synthesized and classified
 - [ ] Zero Critical issues remain (fixed or user-acknowledged)
 - [ ] User decision captured (archive / return to impl / defer)

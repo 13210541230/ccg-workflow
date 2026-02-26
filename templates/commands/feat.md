@@ -21,7 +21,7 @@ $ARGUMENTS
 ```
 # 新会话调用
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend <codex|gemini> {{GEMINI_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 需求：<增强后的需求（如未增强则用 $ARGUMENTS）>
@@ -36,7 +36,7 @@ EOF",
 
 # 复用会话调用
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend <codex|gemini> {{GEMINI_MODEL_FLAG}}resume <SESSION_ID> - \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex resume <SESSION_ID> - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 需求：<增强后的需求（如未增强则用 $ARGUMENTS）>
@@ -50,19 +50,19 @@ EOF",
 })
 ```
 
-**模型参数说明**：
-- `{{GEMINI_MODEL_FLAG}}`：当使用 `--backend gemini` 时，替换为 `--gemini-model gemini-3-pro-preview `（注意末尾空格）；使用 codex 时替换为空字符串
-
 **角色提示词**：
 
-| 阶段 | Codex | Gemini |
-|------|-------|--------|
-| 分析 | `~/.claude/.ccg/prompts/codex/analyzer.md` | `~/.claude/.ccg/prompts/gemini/analyzer.md` |
-| 规划 | `~/.claude/.ccg/prompts/codex/architect.md` | `~/.claude/.ccg/prompts/gemini/architect.md` |
-| 实施 | `~/.claude/.ccg/prompts/codex/architect.md` | `~/.claude/.ccg/prompts/gemini/frontend.md` |
-| 审查 | `~/.claude/.ccg/prompts/codex/reviewer.md` | `~/.claude/.ccg/prompts/gemini/reviewer.md` |
+| 阶段 | Codex-A | Codex-B |
+|------|---------|---------|
+| 分析 | `~/.claude/.ccg/prompts/codex/analyzer.md` | `~/.claude/.ccg/prompts/codex/analyzer.md` |
+| 规划 | `~/.claude/.ccg/prompts/codex/architect.md` | `~/.claude/.ccg/prompts/codex/architect.md` |
+| 实施 | `~/.claude/.ccg/prompts/codex/architect.md` | `~/.claude/.ccg/prompts/codex/architect.md` |
+| 审查 | `~/.claude/.ccg/prompts/codex/reviewer.md` | `~/.claude/.ccg/prompts/codex/reviewer.md` |
 
 **会话复用**：每次调用返回 `SESSION_ID: xxx`，后续阶段用 `resume xxx` 复用上下文。
+- **📌 必须保存 SESSION_ID**：分析阶段保存 `CODEX_SESSION` + `CODEX_B_SESSION`。
+- **复用链路**：分析（新会话）→ 规划（resume）→ 实施（resume）→ 审查（resume）。
+- 全链路复用同一对 Codex 会话，避免每阶段重新扫描项目。
 
 **并行调用**：使用 `run_in_background: true` 启动，用 `TaskOutput` 等待结果。**必须等所有模型返回后才能进入下一阶段**。
 
@@ -76,6 +76,15 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 - 必须指定 `timeout: 600000`，否则默认只有 30 秒会导致提前超时。
 如果 10 分钟后仍未完成，继续用 `TaskOutput` 轮询，**绝对不要 Kill 进程**。
 - 若因等待时间过长跳过了等待 TaskOutput 结果，则**必须调用 `AskUserQuestion` 工具询问用户选择继续等待还是 Kill Task。禁止直接 Kill Task。**
+
+**输出丢失检测**（⚠️ 必须执行）：
+- 每次 `TaskOutput` 返回后，**立即检查 `<output>` 部分是否为空或缺失**。
+- 若输出为空但 `exit_code: 0`，说明 TaskOutput 读取临时文件时发生截断。
+- **恢复步骤**：
+  1. 用 `Read` 工具直接读取输出文件（路径在启动时的 `Output is being written to:` 中），注意使用 Windows 绝对路径格式（如 `C:\Users\...`）而非 Git Bash 格式（`/c/Users/...`）。
+  2. 若临时文件已清理，用 `Glob` 查找 `~/.claude/.ccg/outputs/*.txt`，按时间排序读取最新文件。
+  3. 若持久化文件也不存在，用**相同的命令重新调用该 Codex 实例**（使用 `resume` 复用会话避免重新扫描）。
+- **禁止**：跳过空输出继续下一阶段、用 `cat` 命令读文件（必须用 `Read` 工具）。
 
 ---
 
@@ -103,7 +112,7 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 #### 2.0 Prompt 增强
 
-**Prompt 增强**（按 `/ccg:enhance` 的逻辑执行）：分析 $ARGUMENTS 的意图、缺失信息、隐含假设，补全为结构化需求（明确目标、技术约束、范围边界、验收标准），**用增强结果替代原始 $ARGUMENTS，后续调用 Codex/Gemini 时传入增强后的需求**
+**Prompt 增强**（按 `/ccg:enhance` 的逻辑执行）：分析 $ARGUMENTS 的意图、缺失信息、隐含假设，补全为结构化需求（明确目标、技术约束、范围边界、验收标准），**用增强结果替代原始 $ARGUMENTS，后续调用 Codex 时传入增强后的需求**
 
 #### 2.1 上下文检索
 
@@ -113,9 +122,9 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 | 任务类型 | 判断依据 | 调用流程 |
 |----------|----------|----------|
-| **前端** | 页面、组件、UI、样式、布局 | ui-ux-designer → planner |
+| **前端** | 页面、组件、UI、样式、布局 | planner |
 | **后端** | API、接口、数据库、逻辑、算法 | planner |
-| **全栈** | 同时包含前后端 | ui-ux-designer → planner |
+| **全栈** | 同时包含前后端 | planner |
 
 #### 2.3 调用 Agents
 
@@ -161,11 +170,11 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 #### 3.3 多模型路由实施
 
-按上方调用规范调用外部模型：
+按上方调用规范调用外部模型，**优先使用 `resume $CODEX_SESSION` / `resume $CODEX_B_SESSION` 复用分析阶段的会话**：
 
-- **前端任务**：调用 Gemini，使用实施提示词
-- **后端任务**：调用 Codex，使用实施提示词
-- **全栈任务**：并行调用 Codex + Gemini（`run_in_background: true`），用 `TaskOutput` 等待结果
+- **前端任务**：调用 Codex + `resume $CODEX_B_SESSION`，使用实施提示词
+- **后端任务**：调用 Codex + `resume $CODEX_SESSION`，使用实施提示词
+- **全栈任务**：并行调用 Codex-A（`resume $CODEX_SESSION`）+ Codex-B（`resume $CODEX_B_SESSION`），用 `TaskOutput` 等待结果
 
 **⚠️ 强制规则：必须等待 TaskOutput 返回所有模型的完整结果后才能进入下一阶段**
 
@@ -188,8 +197,7 @@ git diff --name-status
 2. **文档一致性**：规划文档与实际执行保持同步
 3. **依赖关系管理**：前端任务必须确保 UI 设计完整性
 4. **多模型信任规则**：
-   - 前端以 Gemini 为准
-   - 后端以 Codex 为准
+   - 双 Codex 交叉验证
 5. **用户沟通透明**：所有判断和动作都要明确告知用户
 
 ---

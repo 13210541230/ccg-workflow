@@ -1,5 +1,5 @@
 ---
-description: '多模型性能优化：Codex 后端优化 + Gemini 前端优化'
+description: '多模型性能优化：Codex 后端优化 + Codex 架构优化'
 ---
 
 # Optimize - 多模型性能优化
@@ -16,13 +16,13 @@ description: '多模型性能优化：Codex 后端优化 + Gemini 前端优化'
 
 - 优化目标：$ARGUMENTS
 - Codex 专注后端性能（数据库、算法、缓存）
-- Gemini 专注前端性能（渲染、加载、交互）
+- Codex-B 专注架构性能（设计模式、可扩展性、系统优化）
 
 ## 你的角色
 
 你是**性能工程师**，编排多模型优化流程：
-- **Codex** – 后端性能优化（**后端权威**）
-- **Gemini** – 前端性能优化（**前端权威**）
+- **Codex-A** – 后端性能优化（**后端权威**）
+- **Codex-B** – 架构性能优化（**架构视角**）
 - **Claude (自己)** – 综合优化、实施变更
 
 ---
@@ -39,7 +39,7 @@ description: '多模型性能优化：Codex 后端优化 + Gemini 前端优化'
 
 ```
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend <codex|gemini> {{GEMINI_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 需求：<增强后的需求（如未增强则用 $ARGUMENTS）>
@@ -53,15 +53,12 @@ EOF",
 })
 ```
 
-**模型参数说明**：
-- `{{GEMINI_MODEL_FLAG}}`：当使用 `--backend gemini` 时，替换为 `--gemini-model gemini-3-pro-preview `（注意末尾空格）；使用 codex 时替换为空字符串
-
 **角色提示词**：
 
 | 模型 | 提示词 |
 |------|--------|
-| Codex | `~/.claude/.ccg/prompts/codex/optimizer.md` |
-| Gemini | `~/.claude/.ccg/prompts/gemini/optimizer.md` |
+| Codex-A | `~/.claude/.ccg/prompts/codex/optimizer.md` |
+| Codex-B | `~/.claude/.ccg/prompts/codex/optimizer.md` |
 
 **并行调用**：使用 `run_in_background: true` 启动，用 `TaskOutput` 等待结果。**必须等所有模型返回后才能进入下一阶段**。
 
@@ -75,6 +72,15 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 - 必须指定 `timeout: 600000`，否则默认只有 30 秒会导致提前超时。
 如果 10 分钟后仍未完成，继续用 `TaskOutput` 轮询，**绝对不要 Kill 进程**。
 - 若因等待时间过长跳过了等待 TaskOutput 结果，则**必须调用 `AskUserQuestion` 工具询问用户选择继续等待还是 Kill Task。禁止直接 Kill Task。**
+
+**输出丢失检测**（⚠️ 必须执行）：
+- 每次 `TaskOutput` 返回后，**立即检查 `<output>` 部分是否为空或缺失**。
+- 若输出为空但 `exit_code: 0`，说明 TaskOutput 读取临时文件时发生截断。
+- **恢复步骤**：
+  1. 用 `Read` 工具直接读取输出文件（路径在启动时的 `Output is being written to:` 中），注意使用 Windows 绝对路径格式（如 `C:\Users\...`）而非 Git Bash 格式（`/c/Users/...`）。
+  2. 若临时文件已清理，用 `Glob` 查找 `~/.claude/.ccg/outputs/*.txt`，按时间排序读取最新文件。
+  3. 若持久化文件也不存在，用**相同的命令重新调用该 Codex 实例**（使用 `resume` 复用会话避免重新扫描）。
+- **禁止**：跳过空输出继续下一阶段、用 `cat` 命令读文件（必须用 `Read` 工具）。
 
 ---
 
@@ -90,7 +96,7 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 ### 🔍 阶段 0：Prompt 增强（可选）
 
-`[模式：准备]` - **Prompt 增强**（按 `/ccg:enhance` 的逻辑执行）：分析 $ARGUMENTS 的意图、缺失信息、隐含假设，补全为结构化需求（明确目标、技术约束、范围边界、验收标准），**用增强结果替代原始 $ARGUMENTS，后续调用 Codex/Gemini 时传入增强后的需求**
+`[模式：准备]` - **Prompt 增强**（按 `/ccg:enhance` 的逻辑执行）：分析 $ARGUMENTS 的意图、缺失信息、隐含假设，补全为结构化需求（明确目标、技术约束、范围边界、验收标准），**用增强结果替代原始 $ARGUMENTS，后续调用 Codex 时传入增强后的需求**
 
 ### 🔍 阶段 1：性能基线
 
@@ -111,9 +117,9 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
    - 需求：分析后端性能问题（$ARGUMENTS）
    - OUTPUT：性能瓶颈列表、优化方案、预期收益
 
-2. **Gemini 前端分析**：`Bash({ command: "...--backend gemini...", run_in_background: true })`
-   - ROLE_FILE: `~/.claude/.ccg/prompts/gemini/optimizer.md`
-   - 需求：分析前端性能问题（Core Web Vitals）
+2. **Codex 架构分析**：`Bash({ command: "...--backend codex...", run_in_background: true })`
+   - ROLE_FILE: `~/.claude/.ccg/prompts/codex/optimizer.md`
+   - 需求：分析架构性能问题（设计模式、可扩展性、系统优化）
    - OUTPUT：性能瓶颈列表、优化方案、预期收益
 
 用 `TaskOutput` 等待两个模型的完整结果。**必须等所有模型返回后才能进入下一阶段**。
@@ -165,4 +171,4 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 1. **先测量后优化** – 没有数据不盲目优化
 2. **性价比优先** – 高影响 + 低难度优先
 3. **不破坏功能** – 优化不能引入 bug
-4. **信任规则** – 后端以 Codex 为准，前端以 Gemini 为准
+4. **信任规则** – 双 Codex 交叉验证

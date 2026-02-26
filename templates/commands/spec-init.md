@@ -60,9 +60,9 @@ description: '初始化 OpenSpec (OPSX) 环境 + 验证多模型 MCP 工具'
      ```bash
      ~/.claude/bin/codeagent-wrapper --backend codex - "{{WORKDIR}}" <<< "echo test"
      ```
-   - Test Gemini backend:
+   - Test Codex backend (second instance):
      ```bash
-     ~/.claude/bin/codeagent-wrapper --backend gemini --gemini-model gemini-3-pro-preview - "{{WORKDIR}}" <<< "echo test"
+     ~/.claude/bin/codeagent-wrapper --backend codex - "{{WORKDIR}}" <<< "echo test"
      ```
    - For each unavailable tool, display warning with installation instructions.
 
@@ -70,9 +70,9 @@ description: '初始化 OpenSpec (OPSX) 环境 + 验证多模型 MCP 工具'
    - **Check Active Tool**: Is `{{MCP_SEARCH_TOOL}}` available in the current session?
    - **Check Configuration**: If tool is missing, check `~/.claude.json` (or `%APPDATA%\Claude\claude.json` on Windows) for `"ace-tool"` or `"ace-tool-rs"` in `mcpServers`.
    - **Diagnosis**:
-     - If tool available: Mark as "✓ Active".
-     - If config exists but tool missing: Mark as "⚠️ Configured but inactive (Try restarting Claude)".
-     - If neither: Mark as "○ Not installed (Optional)".
+     - If tool available: Mark as "Active".
+     - If config exists but tool missing: Mark as "Configured but inactive (Try restarting Claude)".
+     - If neither: Mark as "Not installed (Optional)".
    - If not installed/configured, suggest: "Run `npx ccg-workflow` and select ace-tool MCP option."
 
 6. **Summary Report**
@@ -85,7 +85,7 @@ description: '初始化 OpenSpec (OPSX) 环境 + 验证多模型 MCP 工具'
    OPSX Skills               ✓/✗
    codeagent-wrapper         ✓/✗
    Codex backend             ✓/✗
-   Gemini backend            ✓/✗
+   Codex backend (2nd)       ✓/✗
    ace-tool MCP              ✓/✗ (optional)
    ```
 
@@ -101,6 +101,6 @@ description: '初始化 OpenSpec (OPSX) 环境 + 验证多模型 MCP 工具'
 - OpenSpec (OPSX) CLI: `npx @fission-ai/openspec --help`
 - OPSX Commands: `/opsx:new`, `/opsx:continue`, `/opsx:apply`, etc.
 - CCG Workflow: `npx ccg-workflow`
-- Codex/Gemini MCP: Bundled with codeagent-wrapper
+- Codex MCP: Bundled with codeagent-wrapper
 - Node.js >= 18.x required for OpenSpec
 <!-- CCG:SPEC:INIT:END -->

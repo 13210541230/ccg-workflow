@@ -63,7 +63,8 @@
     "templates/prompts/gemini/reviewer.md",
     "templates/prompts/gemini/tester.md",
     "templates/prompts/claude/",
-    "templates/output-styles/"
+    "templates/output-styles/",
+    "templates/bin/codeagent-persist.sh"
   ],
   "scripts": {
     "dev": "tsx src/cli.ts",

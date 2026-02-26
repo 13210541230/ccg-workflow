@@ -13,6 +13,8 @@ $ARGUMENTS
 - **语言协议**：与工具/模型交互用**英语**，与用户交互用**中文**
 - **代码主权**：外部模型对文件系统**零写入权限**，所有修改由 Claude 执行
 - **调度模式**：主Agent只做编排和监控，通过 Task 工具 spawn 轻量子Agent执行具体工作
+- **自动流转**：除 Phase 2 计划确认外，各阶段完成后**立即自动进入下一阶段**，无需用户确认。整个 Phase 0→5 是一次连续执行，不得中途暂停等待用户指令
+- **源码隔离**：主Agent**禁止**直接使用 Edit/Write 修改项目源代码文件。仅允许修改 `.claude/plan/` 下的状态文件。所有源码修改必须通过 execute-worker 子Agent 完成。**自检规则**：如果你即将调用 Edit/Write 修改非 `.claude/plan/` 路径的文件，立即停止，改为 spawn 对应 worker 子Agent
 - **止损机制**：当前阶段输出通过验证前，不进入下一阶段
 - **状态驱动**：所有进度通过 planning-with-files 状态文件追踪，确保可恢复、可审计
 
@@ -117,11 +119,12 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 **存放路径**：`.claude/plan/<task-name>/`
 
-**三个状态文件**：
+**四个状态文件**：
 
 | 文件 | 用途 | 更新频率 |
 |------|------|----------|
 | `task_plan.md` | 任务拆解 + 依赖关系 + 子任务描述 | 静态，创建后少改 |
+| `decisions.md` | 讨论阶段确认的关键决策集（复杂任务） | Phase 0.5 写入，后续只读 |
 | `progress.md` | 各阶段状态 + 时间线 + 阶段产出摘要 | 动态，每阶段更新 |
 | `findings.md` | 子Agent产出的发现/问题/审查结果 | 累积追加 |
 
@@ -130,10 +133,14 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 ```markdown
 # Progress: <任务名>
 
-## 状态: <analyzing|planning|confirmed|executing|reviewing|testing|complete>
+## 状态: <initializing|discussing|decisions_confirmed|analyzing|planning|confirmed|executing|reviewing|testing|complete>
+
+## 复杂度: <简单|复杂>
+<评估依据>
 
 ## 时间线
-- [HH:MM] 初始化完成
+- [HH:MM] 初始化完成（复杂度：简单/复杂）
+- [HH:MM] 讨论阶段完成（N 个决策已确认）← 仅复杂任务
 - [HH:MM] 分析阶段完成
 - [HH:MM] 规划阶段完成
 - [HH:MM] 用户确认计划
@@ -181,6 +188,37 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 ## 测试结果
 - [来源: test-worker] <测试结果>
+```
+
+### decisions.md 格式
+
+```markdown
+# Decisions: <任务名>
+
+## 复杂度评估
+- 子任务数：N
+- 涉及文件数：N
+- 架构变更：是/否
+- 备选方案数：N
+- 风险等级：低/中/高
+- **结论**：复杂 → 进入讨论阶段
+
+## 已确认决策
+
+### 决策 1: <决策点名称>
+- **问题**: <需要决策的问题>
+- **选项**: A) ... / B) ... / C) ...
+- **用户选择**: <选项>
+- **原因**: <用户选择的理由或补充说明>
+
+### 决策 2: <决策点名称>
+- **问题**: <需要决策的问题>
+- **选项**: A) ... / B) ...
+- **用户选择**: <选项>
+- **原因**: <理由>
+
+## 决策摘要（供后续阶段引用）
+<将所有已确认决策整理为一段简洁的约束描述，直接可注入 Codex prompt>
 ```
 
 ---
@@ -250,8 +288,92 @@ mcp__sequential-thinking__sequentialthinking({
 
 1. 创建目录：`.claude/plan/<task-name>/`
 2. 写入 `task_plan.md`（sequential-thinking 的任务拆解结果）
-3. 写入 `progress.md`（初始状态：`analyzing`）
+3. 写入 `progress.md`（初始状态：`initializing`）
 4. 写入 `findings.md`（空模板）
+5. 写入 `decisions.md`（空模板，待讨论阶段填充）
+
+#### 0.4 复杂度评估（决定是否进入讨论阶段）
+
+基于 sequential-thinking 的输出，评估以下指标：
+
+| 指标 | 简单 | 复杂 |
+|------|------|------|
+| 子任务数量 | ≤ 3 | > 3 |
+| 涉及文件数 | ≤ 5 | > 5 |
+| 是否涉及架构变更 | 否 | 是 |
+| 是否有多种可行方案 | 只有一条路 | 有 2+ 备选方案 |
+| 风险等级 | 低 | 中/高 |
+
+**判定规则**：任一指标命中"复杂"即进入讨论阶段（Phase 0.5）。全部为"简单"则跳过讨论，直接进入 Phase 1。
+
+将评估结果写入 `progress.md`，向用户简要告知走哪条路径：
+- 简单：`"任务复杂度：简单（N 个子任务，M 个文件），跳过讨论阶段，自动执行。"`
+- 复杂：`"任务复杂度：复杂（原因：...），进入讨论阶段，需要您确认 N 个关键决策。"`
+
+---
+
+### Phase 0.5：讨论与决策（仅复杂任务）
+
+`[模式：讨论]`
+
+> **核心理念**（参考"讨论先行"方法论）：**把"决策"和"规划"分开**。在让 Codex 生成计划之前，先与用户确认所有关键决策。Plan 只是对已确认决策的执行步骤梳理，不是从零开始做决策。
+
+#### 步骤 1：展示现状分析
+
+基于 Phase 0.2 的 sequential-thinking 输出，向用户展示：
+
+```markdown
+## 任务分析摘要
+
+### 核心目标
+<1-2 句话描述>
+
+### 涉及范围
+| 模块/文件 | 影响说明 |
+|-----------|----------|
+
+### 识别到的关键决策点
+以下 N 个决策需要您确认，将直接影响实施方案：
+1. [决策点 A] — <简述为什么这是个决策点>
+2. [决策点 B] — <简述>
+...
+```
+
+#### 步骤 2：逐个确认关键决策
+
+对每个决策点，使用 `AskUserQuestion` 工具让用户选择：
+
+```
+AskUserQuestion({
+  questions: [{
+    question: "<决策问题>？",
+    header: "<决策点名称>",
+    options: [
+      { label: "方案 A（推荐）", description: "<说明 + 推荐理由>" },
+      { label: "方案 B", description: "<说明 + 权衡>" },
+      { label: "方案 C", description: "<说明 + 权衡>" }
+    ],
+    multiSelect: false
+  }]
+})
+```
+
+**规则**：
+- 每个决策点必须给出 2-4 个选项 + 主Agent的推荐
+- 推荐选项放在第一个位置，末尾标注 `（推荐）`
+- 用户选择后，立即追加到 `decisions.md`
+- 如果决策点之间有依赖关系，按依赖顺序逐个询问（前一个的结果可能影响后续选项）
+- 可以将无依赖关系的决策点合并为一个多问题的 AskUserQuestion（最多 4 个问题）
+
+#### 步骤 3：锁定决策集
+
+所有决策确认完毕后：
+
+1. 将完整决策集写入 `decisions.md`（格式见下方状态文件规范）
+2. 向用户展示决策摘要，确认无遗漏
+3. 更新 `progress.md`：状态 → `decisions_confirmed`，记录时间线
+
+**→ 立即自动进入 Phase 1，不等待用户额外指令**
 
 ---
 
@@ -281,6 +403,8 @@ TaskOutput({ task_id: "<analyze_task_id>", block: true, timeout: 600000 })
 2. 追加分析发现到 `findings.md`
 3. 更新 `progress.md`：状态 → `analyzing`，记录时间线
 4. 提取并保存 `CODEX_SESSION` 和 `CODEX_B_SESSION`
+
+**→ 立即自动进入 Phase 2，不等待用户指令**
 
 ---
 
@@ -315,13 +439,15 @@ Task({
 **请审查计划，确认后我将开始执行。(Y/N)**
 ```
 
-用户确认 Y 后 → 更新 `progress.md` 状态为 `confirmed` → 继续 Phase 3
+用户确认 Y 后 → 更新 `progress.md` 状态为 `confirmed` → **立即自动进入 Phase 3，不等待用户额外指令**
 
 ---
 
 ### Phase 3：实施（派发子Agent）
 
 `[模式：实施]`
+
+> **硬约束**：本阶段你的**唯一操作**是 spawn execute-worker 子Agent。主Agent禁止直接调用 Edit/Write 修改项目源代码。所有代码编辑由 execute-worker 内部完成。
 
 **spawn execute-worker 子Agent**：
 
@@ -356,6 +482,8 @@ Task({
 **结果处理**：
 1. 每个 worker 完成后，追加变更产出到 `findings.md`
 2. 更新 `progress.md`：状态 → `executing`，记录时间线
+
+**→ 立即自动进入 Phase 4，不等待用户指令**
 
 ---
 
@@ -418,6 +546,8 @@ TaskOutput({ task_id: "<quality_task_id>", block: true, timeout: 600000 })
 **Critical 问题自动回退**：
 - 如有 Critical 问题 → 自动回退到 Phase 3 修复 → 再次审查
 - 最多 2 轮回退。2 轮后仍有 Critical → 升级给用户决策
+
+**→ 无 Critical 问题时，立即自动进入 Phase 5，不等待用户指令**
 
 ---
 
@@ -486,11 +616,13 @@ Task({
 
 ## 关键规则
 
-1. **调度不执行** -- 主Agent不直接调用 Codex，全部通过子Agent
-2. **状态可追踪** -- 每个阶段更新 progress.md，确保可恢复
-3. **代码主权** -- 外部模型对文件系统零写入权限，所有修改由 Claude 执行
-4. **信任规则** -- 双 Codex 交叉验证，综合审查取共识
-5. **止损机制** -- 当前阶段输出未验证前，不进入下一阶段
+1. **调度不执行** -- 主Agent不直接调用 Codex、不直接编辑项目源码，全部通过子Agent完成
+2. **自动流转** -- Phase 0→5 是一次连续执行。除 Phase 2 计划确认外，阶段间自动衔接，不暂停等待用户
+3. **源码隔离** -- 主Agent仅可修改 `.claude/plan/` 下的状态文件。项目源码的 Edit/Write 操作只能由 execute-worker 子Agent 执行
+4. **状态可追踪** -- 每个阶段更新 progress.md，确保可恢复
+5. **代码主权** -- 外部模型对文件系统零写入权限，所有修改由 Claude（子Agent内部）执行
+6. **信任规则** -- 双 Codex 交叉验证，综合审查取共识
+7. **止损机制** -- 当前阶段输出未验证前，不进入下一阶段
 
 ---
 
@@ -518,6 +650,10 @@ Task({
 
 ## 上下文
 {{PROJECT_CONTEXT}}
+
+## 已确认决策（硬约束）
+{{DECISIONS_CONTENT}}
+> 以上决策已由用户确认，分析时必须遵守，不得提出与之矛盾的方案。若 DECISIONS_CONTENT 为空，说明是简单任务，无预设决策约束。
 
 ## 调用规范
 
@@ -620,6 +756,10 @@ TaskOutput({ task_id: "<codex_b_task_id>", block: true, timeout: 600000 })
 ## 分析阶段结论
 {{ANALYZE_FINDINGS}}
 
+## 已确认决策（硬约束）
+{{DECISIONS_CONTENT}}
+> 以上决策已由用户确认并锁定。规划时必须严格遵守这些决策，Plan 只需梳理执行步骤，不得重新做已确认的决策。若 DECISIONS_CONTENT 为空，说明是简单任务，无预设决策约束。
+
 ## 调用规范
 
 使用 codeagent-wrapper 并行调用 Codex-A（后端规划）和 Codex-B（架构规划），复用分析阶段的会话。
@@ -710,6 +850,9 @@ TaskOutput({ task_id: "<codex_b_task_id>", block: true, timeout: 600000 })
 
 ## 上下文
 {{PROJECT_CONTEXT}}
+
+## 已确认决策（硬约束）
+{{DECISIONS_CONTENT}}
 
 ## 实施计划
 {{PLAN_CONTENT}}

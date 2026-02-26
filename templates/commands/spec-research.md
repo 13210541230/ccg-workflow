@@ -60,7 +60,7 @@ description: '需求 → 约束集（并行探索 + OPSX 提案）'
      "success_criteria_hints": ["observable success behaviors"]
    }
    ```
-   - Run Codex for backend boundaries, Gemini for frontend boundaries.
+   - Run Codex for all context boundaries.
 
 5. **Aggregate and Synthesize**
    - Collect all subagent outputs.

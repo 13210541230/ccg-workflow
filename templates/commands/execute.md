@@ -12,7 +12,7 @@ $ARGUMENTS
 
 - **语言协议**：与工具/模型交互用**英语**，与用户交互用**中文**
 - **代码主权**：外部模型对文件系统**零写入权限**，所有修改由 Claude 执行
-- **脏原型重构**：将 Codex/Gemini 的 Unified Diff 视为"脏原型"，必须重构为生产级代码
+- **脏原型重构**：将 Codex 的 Unified Diff 视为"脏原型"，必须重构为生产级代码
 - **止损机制**：当前阶段输出通过验证前，不进入下一阶段
 - **前置条件**：仅在用户对 `/ccg:plan` 输出明确回复 "Y" 后执行（如缺失，必须先二次确认）
 
@@ -31,7 +31,7 @@ $ARGUMENTS
 ```
 # 复用会话调用（推荐）- 原型生成（Implementation Prototype）
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend <codex|gemini> {{GEMINI_MODEL_FLAG}}resume <SESSION_ID> - \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex resume <SESSION_ID> - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 需求：<任务描述>
@@ -46,7 +46,7 @@ EOF",
 
 # 新会话调用 - 原型生成（Implementation Prototype）
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend <codex|gemini> {{GEMINI_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 需求：<任务描述>
@@ -64,7 +64,7 @@ EOF",
 
 ```
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend <codex|gemini> {{GEMINI_MODEL_FLAG}}resume <SESSION_ID> - \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex resume <SESSION_ID> - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 Scope: Audit the final code changes.
@@ -85,15 +85,12 @@ EOF",
 })
 ```
 
-**模型参数说明**：
-- `{{GEMINI_MODEL_FLAG}}`：当使用 `--backend gemini` 时，替换为 `--gemini-model gemini-3-pro-preview `（注意末尾空格）；使用 codex 时替换为空字符串
-
 **角色提示词**：
 
-| 阶段 | Codex | Gemini |
-|------|-------|--------|
-| 实施 | `~/.claude/.ccg/prompts/codex/architect.md` | `~/.claude/.ccg/prompts/gemini/frontend.md` |
-| 审查 | `~/.claude/.ccg/prompts/codex/reviewer.md` | `~/.claude/.ccg/prompts/gemini/reviewer.md` |
+| 阶段 | Codex-A | Codex-B |
+|------|---------|---------|
+| 实施 | `~/.claude/.ccg/prompts/codex/architect.md` | `~/.claude/.ccg/prompts/codex/architect.md` |
+| 审查 | `~/.claude/.ccg/prompts/codex/reviewer.md` | `~/.claude/.ccg/prompts/codex/reviewer.md` |
 
 **会话复用**：如果 `/ccg:plan` 提供了 SESSION_ID，使用 `resume <SESSION_ID>` 复用上下文。
 
@@ -107,6 +104,15 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 - 必须指定 `timeout: 600000`，否则默认只有 30 秒会导致提前超时
 - 若 10 分钟后仍未完成，继续用 `TaskOutput` 轮询，**绝对不要 Kill 进程**
 - 若因等待时间过长跳过了等待，**必须调用 `AskUserQuestion` 询问用户选择继续等待还是 Kill Task**
+
+**输出丢失检测**（⚠️ 必须执行）：
+- 每次 `TaskOutput` 返回后，**立即检查 `<output>` 部分是否为空或缺失**。
+- 若输出为空但 `exit_code: 0`，说明 TaskOutput 读取临时文件时发生截断。
+- **恢复步骤**：
+  1. 用 `Read` 工具直接读取输出文件（路径在启动时的 `Output is being written to:` 中），注意使用 Windows 绝对路径格式（如 `C:\Users\...`）而非 Git Bash 格式（`/c/Users/...`）。
+  2. 若临时文件已清理，用 `Glob` 查找 `~/.claude/.ccg/outputs/*.txt`，按时间排序读取最新文件。
+  3. 若持久化文件也不存在，用**相同的命令重新调用该 Codex 实例**（使用 `resume` 复用会话避免重新扫描）。
+- **禁止**：跳过空输出继续下一阶段、用 `cat` 命令读文件（必须用 `Read` 工具）。
 
 ---
 
@@ -134,9 +140,9 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
    | 任务类型 | 判断依据 | 路由 |
    |----------|----------|------|
-   | **前端** | 页面、组件、UI、样式、布局 | Gemini |
+   | **前端** | 页面、组件、UI、样式、布局 | Codex |
    | **后端** | API、接口、数据库、逻辑、算法 | Codex |
-   | **全栈** | 同时包含前后端 | Codex ∥ Gemini 并行 |
+   | **全栈** | 同时包含前后端 | Codex-A ∥ Codex-B 并行 |
 
 ---
 
@@ -174,16 +180,13 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 **根据任务类型路由**：
 
-#### Route A: 前端/UI/样式 → Gemini
+#### Route A: 前端/UI/样式 → Codex
 
-**限制**：上下文 < 32k tokens
-
-1. 调用 Gemini（使用 `~/.claude/.ccg/prompts/gemini/frontend.md`）
+1. 调用 Codex（使用 `~/.claude/.ccg/prompts/codex/architect.md`）
 2. 输入：计划内容 + 检索到的上下文 + 目标文件
 3. OUTPUT: `Unified Diff Patch ONLY. Strictly prohibit any actual modifications.`
-4. **Gemini 是前端设计的权威，其 CSS/React/Vue 原型为最终视觉基准**
-5. ⚠️ **警告**：忽略 Gemini 对后端逻辑的建议
-6. 若计划包含 `GEMINI_SESSION`：优先 `resume <GEMINI_SESSION>`
+4. **Codex 架构视角，综合前端设计与架构一致性**
+5. 若计划包含 `CODEX_B_SESSION`：优先 `resume <CODEX_B_SESSION>`
 
 #### Route B: 后端/逻辑/算法 → Codex
 
@@ -196,8 +199,8 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 #### Route C: 全栈 → 并行调用
 
 1. **并行调用**（`run_in_background: true`）：
-   - Gemini：处理前端部分
-   - Codex：处理后端部分
+   - Codex-A：处理后端部分
+   - Codex-B：处理前端/架构部分
 2. 用 `TaskOutput` 等待两个模型的完整结果
 3. 各自使用计划中对应的 `SESSION_ID` 进行 `resume`（若缺失则创建新会话）
 
@@ -211,7 +214,7 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 **Claude 作为代码主权者执行以下步骤**：
 
-1. **读取 Diff**：解析 Codex/Gemini 返回的 Unified Diff Patch
+1. **读取 Diff**：解析 Codex 返回的 Unified Diff Patch
 
 2. **思维沙箱**：
    - 模拟应用 Diff 到目标文件
@@ -244,24 +247,24 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 #### 5.1 自动审计
 
-**变更生效后，强制立即并行调用** Codex 和 Gemini 进行 Code Review：
+**变更生效后，强制立即并行调用** Codex-A 和 Codex-B 进行 Code Review：
 
-1. **Codex 审查**（`run_in_background: true`）：
+1. **Codex-A 审查**（`run_in_background: true`）：
    - ROLE_FILE: `~/.claude/.ccg/prompts/codex/reviewer.md`
    - 输入：变更的 Diff + 目标文件
    - 关注：安全性、性能、错误处理、逻辑正确性
 
-2. **Gemini 审查**（`run_in_background: true`）：
-   - ROLE_FILE: `~/.claude/.ccg/prompts/gemini/reviewer.md`
+2. **Codex-B 审查**（`run_in_background: true`）：
+   - ROLE_FILE: `~/.claude/.ccg/prompts/codex/reviewer.md`
    - 输入：变更的 Diff + 目标文件
-   - 关注：可访问性、设计一致性、用户体验
+   - 关注：架构一致性、设计合理性、可扩展性
 
 用 `TaskOutput` 等待两个模型的完整审查结果。优先复用 Phase 3 的会话（`resume <SESSION_ID>`）以保持上下文一致。
 
 #### 5.2 整合修复
 
-1. 综合 Codex + Gemini 的审查意见
-2. 按信任规则权衡：后端以 Codex 为准，前端以 Gemini 为准
+1. 综合 Codex-A + Codex-B 的审查意见
+2. 按信任规则权衡：双 Codex 交叉验证
 3. 执行必要的修复
 4. 修复后按需重复 Phase 5.1（直到风险可接受）
 
@@ -278,8 +281,8 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 | path/to/file.ts | 修改 | 描述 |
 
 ### 审计结果
-- Codex：<通过/发现 N 个问题>
-- Gemini：<通过/发现 N 个问题>
+- Codex-A：<通过/发现 N 个问题>
+- Codex-B：<通过/发现 N 个问题>
 
 ### 后续建议
 1. [ ] <建议的测试步骤>
@@ -291,8 +294,8 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 ## 关键规则
 
 1. **代码主权** – 所有文件修改由 Claude 执行，外部模型零写入权限
-2. **脏原型重构** – Codex/Gemini 的输出视为草稿，必须重构
-3. **信任规则** – 后端以 Codex 为准，前端以 Gemini 为准
+2. **脏原型重构** – Codex 的输出视为草稿，必须重构
+3. **信任规则** – 双 Codex 交叉验证
 4. **最小变更** – 仅修改必要的代码，不引入副作用
 5. **强制审计** – 变更后必须进行多模型 Code Review
 

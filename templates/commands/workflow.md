@@ -1,5 +1,5 @@
 ---
-description: '多模型协作开发工作流（研究→构思→计划→执行→优化→评审），智能路由前端→Gemini、后端→Codex'
+description: '多模型协作开发工作流（研究→构思→计划→执行→优化→评审），Codex 双视角并行分析（逻辑 + 架构）'
 ---
 
 # Workflow - 多模型协作开发
@@ -16,7 +16,7 @@ description: '多模型协作开发工作流（研究→构思→计划→执行
 
 - 要开发的任务：$ARGUMENTS
 - 带质量把关的结构化 6 阶段工作流
-- 多模型协作：Codex（后端）+ Gemini（前端）+ Claude（编排）
+- 多模型协作：Codex（后端）+ Codex（架构视角）+ Claude（编排）
 - MCP 服务集成（ace-tool）以增强功能
 
 ## 你的角色
@@ -25,7 +25,7 @@ description: '多模型协作开发工作流（研究→构思→计划→执行
 
 **协作模型**：
 - **Codex** – 后端逻辑、算法、调试（**后端权威，可信赖**）
-- **Gemini** – 前端 UI/UX、视觉设计（**前端高手，后端意见仅供参考**）
+- **Codex-B（架构视角）** – 架构设计、系统分析（**架构视角，与逻辑视角交叉验证**）
 - **Claude (自己)** – 编排、计划、执行、交付
 
 ---
@@ -43,7 +43,7 @@ description: '多模型协作开发工作流（研究→构思→计划→执行
 ```
 # 新会话调用
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend <codex|gemini> {{GEMINI_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 需求：<增强后的需求（如未增强则用 $ARGUMENTS）>
@@ -58,7 +58,7 @@ EOF",
 
 # 复用会话调用
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend <codex|gemini> {{GEMINI_MODEL_FLAG}}resume <SESSION_ID> - \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex resume <SESSION_ID> - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 需求：<增强后的需求（如未增强则用 $ARGUMENTS）>
@@ -72,16 +72,13 @@ EOF",
 })
 ```
 
-**模型参数说明**：
-- `{{GEMINI_MODEL_FLAG}}`：当使用 `--backend gemini` 时，替换为 `--gemini-model gemini-3-pro-preview `（注意末尾空格）；使用 codex 时替换为空字符串
-
 **角色提示词**：
 
-| 阶段 | Codex | Gemini |
+| 阶段 | Codex | Codex (架构) |
 |------|-------|--------|
-| 分析 | `~/.claude/.ccg/prompts/codex/analyzer.md` | `~/.claude/.ccg/prompts/gemini/analyzer.md` |
-| 规划 | `~/.claude/.ccg/prompts/codex/architect.md` | `~/.claude/.ccg/prompts/gemini/architect.md` |
-| 审查 | `~/.claude/.ccg/prompts/codex/reviewer.md` | `~/.claude/.ccg/prompts/gemini/reviewer.md` |
+| 分析 | `~/.claude/.ccg/prompts/codex/analyzer.md` | `~/.claude/.ccg/prompts/codex/analyzer.md` |
+| 规划 | `~/.claude/.ccg/prompts/codex/architect.md` | `~/.claude/.ccg/prompts/codex/architect.md` |
+| 审查 | `~/.claude/.ccg/prompts/codex/reviewer.md` | `~/.claude/.ccg/prompts/codex/reviewer.md` |
 
 **会话复用**：每次调用返回 `SESSION_ID: xxx`，后续阶段用 `resume xxx` 子命令复用上下文（注意：是 `resume`，不是 `--resume`）。
 
@@ -97,6 +94,15 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 - 必须指定 `timeout: 600000`，否则默认只有 30 秒会导致提前超时。
 如果 10 分钟后仍未完成，继续用 `TaskOutput` 轮询，**绝对不要 Kill 进程**。
 - 若因等待时间过长跳过了等待 TaskOutput 结果，则**必须调用 `AskUserQuestion` 工具询问用户选择继续等待还是 Kill Task。禁止直接 Kill Task。**
+
+**输出丢失检测**（⚠️ 必须执行）：
+- 每次 `TaskOutput` 返回后，**立即检查 `<output>` 部分是否为空或缺失**。
+- 若输出为空但 `exit_code: 0`，说明 TaskOutput 读取临时文件时发生截断。
+- **恢复步骤**：
+  1. 用 `Read` 工具直接读取输出文件（路径在启动时的 `Output is being written to:` 中），注意使用 Windows 绝对路径格式（如 `C:\Users\...`）而非 Git Bash 格式（`/c/Users/...`）。
+  2. 若临时文件已清理，用 `Glob` 查找 `~/.claude/.ccg/outputs/*.txt`，按时间排序读取最新文件。
+  3. 若持久化文件也不存在，用**相同的命令重新调用该 Codex 实例**（使用 `resume` 复用会话避免重新扫描）。
+- **禁止**：跳过空输出继续下一阶段、用 `cat` 命令读文件（必须用 `Read` 工具）。
 
 ---
 
@@ -118,7 +124,7 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 `[模式：研究]` - 理解需求并收集上下文：
 
-1. **Prompt 增强**（按 `/ccg:enhance` 的逻辑执行）：分析 $ARGUMENTS 的意图、缺失信息、隐含假设，补全为结构化需求（明确目标、技术约束、范围边界、验收标准），**用增强结果替代原始 $ARGUMENTS，后续调用 Codex/Gemini 时传入增强后的需求**
+1. **Prompt 增强**（按 `/ccg:enhance` 的逻辑执行）：分析 $ARGUMENTS 的意图、缺失信息、隐含假设，补全为结构化需求（明确目标、技术约束、范围边界、验收标准），**用增强结果替代原始 $ARGUMENTS，后续调用 Codex 时传入增强后的需求**
 2. **上下文检索**：调用 `{{MCP_SEARCH_TOOL}}`
 3. **需求完整性评分**（0-10 分）：
    - 目标明确性（0-3）、预期结果（0-3）、边界范围（0-2）、约束条件（0-2）
@@ -130,9 +136,9 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 **并行调用**（`run_in_background: true`）：
 - Codex：使用分析提示词，输出技术可行性、方案、风险
-- Gemini：使用分析提示词，输出 UI 可行性、方案、体验
+- Codex-B：使用分析提示词，输出架构可行性、设计方案
 
-用 `TaskOutput` 等待结果。**📌 保存 SESSION_ID**（`CODEX_SESSION` 和 `GEMINI_SESSION`）。
+用 `TaskOutput` 等待结果。**📌 保存 SESSION_ID**（`CODEX_SESSION` 和 `CODEX_B_SESSION`）。
 
 **务必遵循上方 `多模型调用规范` 的 `重要` 指示**
 
@@ -144,13 +150,13 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 **并行调用**（复用会话 `resume <SESSION_ID>`）：
 - Codex：使用规划提示词 + `resume $CODEX_SESSION`，输出后端架构
-- Gemini：使用规划提示词 + `resume $GEMINI_SESSION`，输出前端架构
+- Codex-B：使用规划提示词 + `resume $CODEX_B_SESSION`，输出架构规划
 
 用 `TaskOutput` 等待结果。
 
 **务必遵循上方 `多模型调用规范` 的 `重要` 指示**
 
-**Claude 综合规划**：采纳 Codex 后端规划 + Gemini 前端规划，用户批准后存入 `.claude/plan/任务名.md`
+**Claude 综合规划**：采纳 Codex 后端规划 + Codex 架构规划，用户批准后存入 `.claude/plan/任务名.md`
 
 ### ⚡ 阶段 4：实施
 
@@ -164,9 +170,10 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 `[模式：优化]` - 多模型并行审查：
 
-**并行调用**：
-- Codex：使用审查提示词，关注安全、性能、错误处理
-- Gemini：使用审查提示词，关注可访问性、设计一致性
+**并行调用**（复用会话 `resume <SESSION_ID>`）：
+- Codex：使用审查提示词 + `resume $CODEX_SESSION`，关注安全、性能、错误处理
+- Codex-B：使用审查提示词 + `resume $CODEX_B_SESSION`，关注架构合理性、设计一致性
+- **优先复用阶段 2 保存的 SESSION_ID**，避免重新扫描项目。若 SESSION_ID 不可用，创建新会话。
 
 用 `TaskOutput` 等待结果。整合审查意见，用户确认后执行优化。
 
