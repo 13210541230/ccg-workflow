@@ -191,10 +191,9 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 - [来源: execute-worker] <变更文件列表 + diff 摘要>
 
 ## 审查结果
-- [来源: review-worker] <按 Critical/Major/Minor/Suggestion 分类>
-- [来源: architect-review] <架构审查结果>
-- [来源: security-auditor] <安全审计结果>
-- [来源: code-reviewer] <代码质量审查结果>
+- [来源: review-worker/Codex-A] <安全性 + 性能 + 逻辑正确性审查>
+- [来源: review-worker/Codex-B] <架构一致性 + 代码质量审查>
+- [综合] <按 Critical/Major/Minor/Suggestion 分级的去重合并结果>
 
 ## 测试结果
 - [来源: test-worker] <测试结果>
@@ -632,58 +631,29 @@ Task({
 
 `[模式：审查]`
 
-**五层并行审查** -- 同时 spawn 4 个审查 Agent：
+**Codex 双模型五维审查** -- spawn review-worker 子Agent（内部并行调用 Codex-A + Codex-B，覆盖安全/性能/架构/代码质量/可维护性全部维度）：
 
 ```
-// 1. Codex 双模型交叉审查（review-worker 内部处理 Codex-A + Codex-B）
 Task({
   subagent_type: "general-purpose",
   prompt: "<REVIEW_WORKER_PROMPT — 见末尾模板，注入变更 diff + SESSION_ID>",
-  description: "Codex双模型交叉审查",
-  run_in_background: true
-})
-
-// 2. 架构审查
-Task({
-  subagent_type: "comprehensive-review:architect-review",
-  prompt: "审查以下代码变更，关注架构合理性、模块划分、可扩展性：\n<git diff 内容>",
-  description: "架构审查",
-  run_in_background: true
-})
-
-// 3. 安全审计
-Task({
-  subagent_type: "comprehensive-review:security-auditor",
-  prompt: "审查以下代码变更，关注安全漏洞、敏感信息泄露、注入风险：\n<git diff 内容>",
-  description: "安全审计",
-  run_in_background: true
-})
-
-// 4. 代码质量审查
-Task({
-  subagent_type: "comprehensive-review:code-reviewer",
-  prompt: "审查以下代码变更，关注代码质量、可读性、错误处理、测试覆盖：\n<git diff 内容>",
-  description: "代码质量审查",
+  description: "Codex双模型五维审查",
   run_in_background: true
 })
 ```
 
-**等待全部结果**：
+**等待结果**：
 
 ```
 TaskOutput({ task_id: "<review_task_id>", block: true, timeout: 600000 })
-TaskOutput({ task_id: "<architect_task_id>", block: true, timeout: 600000 })
-TaskOutput({ task_id: "<security_task_id>", block: true, timeout: 600000 })
-TaskOutput({ task_id: "<quality_task_id>", block: true, timeout: 600000 })
 ```
 
 **结果处理**：
-1. 收集全部审查结果
+1. 检查子Agent输出是否完整（非空验证）
 2. 按 Critical / Major / Minor / Suggestion 分级
-3. 去重合并（多个审查者报告同一问题时合并）
-4. 追加到 `findings.md`
-5. 更新 `progress.md`：状态 → `reviewing`，记录时间线
-6. 执行「阶段完成后处理协议」
+3. 追加到 `findings.md`
+4. 更新 `progress.md`：状态 → `reviewing`，记录时间线
+5. 执行「阶段完成后处理协议」
 
 **Critical 问题自动回退**：
 - 如有 Critical 问题 → 自动回退到 Phase 3 修复 → 再次审查
@@ -1145,40 +1115,53 @@ TaskOutput({ task_id: "<codex_task_id>", block: true, timeout: 600000 })
 
 ## 调用规范
 
-使用 codeagent-wrapper 并行调用 Codex-A（安全/性能）和 Codex-B（架构/设计）。
+使用 codeagent-wrapper 并行调用 Codex-A 和 Codex-B，双视角覆盖 5 个审查维度：
+
+| 维度 | Codex-A | Codex-B |
+|------|---------|---------|
+| 安全性 | 注入风险、敏感信息泄露、权限校验 | — |
+| 性能 | 算法复杂度、资源泄漏、并发问题 | — |
+| 逻辑正确性 | 边界条件、错误处理、数据流 | — |
+| 架构一致性 | — | 模块划分、设计模式、可扩展性 |
+| 代码质量 | — | 可读性、可维护性、测试覆盖、命名规范 |
 
 **并行调用 Codex（必须同时发起两个 Bash 调用）**
 
-Codex-A（安全/性能审查）:
+Codex-A（安全 + 性能 + 逻辑正确性）:
 Bash({
   command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex resume {{CODEX_SESSION}} - \"$(pwd)\" <<'EOF'
 ROLE_FILE: ~/.claude/.ccg/prompts/codex/reviewer.md
 <TASK>
 审查以下代码变更：
 {{DIFF_CONTENT}}
-视角：安全性、性能、错误处理、逻辑正确性
+你负责 3 个维度的审查，每个维度独立输出：
+1. **安全性**：注入风险（SQL/XSS/命令注入）、敏感信息泄露、权限校验缺失、OWASP Top 10
+2. **性能**：算法复杂度、资源泄漏（内存/文件句柄/连接）、并发竞态、不必要的开销
+3. **逻辑正确性**：边界条件、错误处理遗漏、数据流断裂、空值/异常路径
 </TASK>
-OUTPUT: 按 Critical/Major/Minor/Suggestion 分类列出问题，JSON 格式
+OUTPUT: 按 Critical/Major/Minor/Suggestion 分类列出问题，每条标注所属维度 [安全/性能/逻辑]，JSON 格式
 EOF",
   run_in_background: true,
   timeout: 3600000,
-  description: "Codex-A 安全性能审查"
+  description: "Codex-A 安全+性能+逻辑审查"
 })
 
-Codex-B（架构/设计审查）:
+Codex-B（架构一致性 + 代码质量）:
 Bash({
   command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex resume {{CODEX_B_SESSION}} - \"$(pwd)\" <<'EOF'
 ROLE_FILE: ~/.claude/.ccg/prompts/codex/reviewer.md
 <TASK>
 审查以下代码变更：
 {{DIFF_CONTENT}}
-视角：架构一致性、设计合理性、可扩展性、可维护性
+你负责 2 个维度的审查，每个维度独立输出：
+1. **架构一致性**：模块划分合理性、设计模式一致性、接口设计、可扩展性、与项目现有架构的契合度
+2. **代码质量**：可读性、可维护性、命名规范、错误处理风格、测试覆盖建议、重复代码
 </TASK>
-OUTPUT: 按 Critical/Major/Minor/Suggestion 分类列出问题，JSON 格式
+OUTPUT: 按 Critical/Major/Minor/Suggestion 分类列出问题，每条标注所属维度 [架构/质量]，JSON 格式
 EOF",
   run_in_background: true,
   timeout: 3600000,
-  description: "Codex-B 架构设计审查"
+  description: "Codex-B 架构+质量审查"
 })
 
 **等待结果**
@@ -1196,20 +1179,30 @@ TaskOutput({ task_id: "<codex_b_task_id>", block: true, timeout: 600000 })
 返回结构化 Markdown 结果，不与用户交互：
 
 ```markdown
-## 审查结果
+## 审查结果（5 维度 × 双模型交叉验证）
 
 ### Critical (N issues) - 必须修复
-- [安全] file.ts:42 - 描述 — [Codex-A/Codex-B]
+- [安全] file.ts:42 - 描述 — [Codex-A]
 - [逻辑] api.ts:15 - 描述 — [Codex-A]
 
 ### Major (N issues) - 建议修复
-- [性能] service.ts:88 - 描述 — [Codex-A/Codex-B]
+- [性能] service.ts:88 - 描述 — [Codex-A]
+- [架构] router.ts:30 - 描述 — [Codex-B]
 
 ### Minor (N issues) - 可选修复
-- [风格] utils.ts:20 - 描述 — [Codex-B]
+- [质量] utils.ts:20 - 描述 — [Codex-B]
 
 ### Suggestion (N items)
-- [优化] helper.ts:55 - 描述 — [Codex-B]
+- [质量] helper.ts:55 - 描述 — [Codex-B]
+
+### 维度覆盖
+| 维度 | 来源 | 发现数 |
+|------|------|--------|
+| 安全性 | Codex-A | N |
+| 性能 | Codex-A | N |
+| 逻辑正确性 | Codex-A | N |
+| 架构一致性 | Codex-B | N |
+| 代码质量 | Codex-B | N |
 
 ### SESSION_ID
 - CODEX_SESSION: <session_id>
