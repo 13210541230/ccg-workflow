@@ -17,7 +17,7 @@ description: '多模型协作开发工作流（研究→构思→计划→执行
 - 要开发的任务：$ARGUMENTS
 - 带质量把关的结构化 6 阶段工作流
 - 多模型协作：Codex（后端）+ Codex（架构视角）+ Claude（编排）
-- MCP 服务集成（ace-tool）以增强功能
+- MCP 服务集成（fast-context）以增强功能
 
 ## 你的角色
 

@@ -16,7 +16,7 @@ description: 'Agent Teams 规划 - Lead 调用 Codex 并行分析，产出零决
 **Steps**
 1. **上下文收集**
    - 用 Glob/Grep/Read 分析项目结构、技术栈、现有代码模式。
-   - 如果 `mcp__ace-tool__search_context` 可用，优先语义检索。
+   - 如果 `{{MCP_SEARCH_TOOL}}` 可用，优先语义检索。
    - 整理出：技术栈、目录结构、关键文件、现有模式。
    - **会话复用检查**：读取 `.claude/team-plan/<任务名>-research.md`，检查是否包含 `Codex Sessions` 部分。若存在 `CODEX_RESEARCH_SESSION` 和 `CODEX_B_RESEARCH_SESSION`，在步骤 2 中使用 `resume` 复用会话，避免重新扫描项目。
 

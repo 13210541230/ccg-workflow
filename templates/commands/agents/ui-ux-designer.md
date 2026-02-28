@@ -27,7 +27,7 @@ color: magenta
 
 ### 步骤 2：检索现有组件（如有需要）
 
-如果项目已有组件库，使用 ace-tool 检索：
+如果项目已有组件库，使用 MCP 检索工具：
 
 ```
 {{MCP_SEARCH_TOOL}} {

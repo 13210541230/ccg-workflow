@@ -436,10 +436,10 @@ function injectConfigVariables(content: string, config: {
   const liteModeFlag = config.liteMode ? '--lite ' : ''
   processed = processed.replace(/\{\{LITE_MODE_FLAG\}\}/g, liteModeFlag)
 
-  // MCP tool injection based on provider
-  const mcpProvider = config.mcpProvider || 'ace-tool'
-  if (mcpProvider === 'fast-context') {
-    // fast-context MCP tools
+  // MCP tool injection based on provider ('skip' defaults to fast-context)
+  const mcpProvider = config.mcpProvider || 'fast-context'
+  if (mcpProvider === 'fast-context' || mcpProvider === 'skip') {
+    // fast-context MCP tools (default)
     processed = processed.replace(/\{\{MCP_SEARCH_TOOL\}\}/g, 'mcp__fast-context__fast_context_search')
     processed = processed.replace(/\{\{MCP_SEARCH_PARAM\}\}/g, 'query')
     processed = processed.replace(/\{\{MCP_PATH_PARAM\}\}/g, 'project_path')
@@ -556,7 +556,7 @@ export async function installWorkflows(
       review: { models: ['codex', 'codex'] },
     },
     liteMode: config?.liteMode || false,
-    mcpProvider: config?.mcpProvider || 'ace-tool',
+    mcpProvider: config?.mcpProvider || 'fast-context',
   }
   const result: InstallResult = {
     success: true,
