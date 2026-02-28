@@ -30,7 +30,7 @@
 - 完全独立：Team 系列不依赖现有 ccg 命令，自成体系
 
 ### 2026-02-08 (v1.7.57)
-- MCP 工具扩展：新增 ContextWeaver（推荐）+ 辅助工具（Context7/Playwright/DeepWiki/Exa）
+- MCP 工具扩展：新增 fast-context（推荐）+ 辅助工具（Context7/Playwright/DeepWiki/Exa）
 - API 配置：初始化和菜单新增 API 配置，自动添加优化配置和权限白名单
 - 实用工具：新增 ccusage（用量分析）+ CCometixLine（状态栏）
 - Claude Code 安装：支持 npm/homebrew/curl/powershell/cmd 多种方式

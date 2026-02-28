@@ -438,15 +438,17 @@ function injectConfigVariables(content: string, config: {
 
   // MCP tool injection based on provider
   const mcpProvider = config.mcpProvider || 'ace-tool'
-  if (mcpProvider === 'contextweaver') {
-    // ContextWeaver MCP tools
-    processed = processed.replace(/\{\{MCP_SEARCH_TOOL\}\}/g, 'mcp__contextweaver__codebase-retrieval')
-    processed = processed.replace(/\{\{MCP_SEARCH_PARAM\}\}/g, 'information_request')
+  if (mcpProvider === 'fast-context') {
+    // fast-context MCP tools
+    processed = processed.replace(/\{\{MCP_SEARCH_TOOL\}\}/g, 'mcp__fast-context__fast_context_search')
+    processed = processed.replace(/\{\{MCP_SEARCH_PARAM\}\}/g, 'query')
+    processed = processed.replace(/\{\{MCP_PATH_PARAM\}\}/g, 'project_path')
   }
   else {
     // ace-tool / ace-tool-rs MCP tools (default)
     processed = processed.replace(/\{\{MCP_SEARCH_TOOL\}\}/g, 'mcp__ace-tool__search_context')
     processed = processed.replace(/\{\{MCP_SEARCH_PARAM\}\}/g, 'query')
+    processed = processed.replace(/\{\{MCP_PATH_PARAM\}\}/g, 'project_root_path')
   }
 
   return processed
@@ -1096,65 +1098,21 @@ export async function installAceToolRs(config: AceToolConfig): Promise<{ success
 }
 
 /**
- * ContextWeaver MCP configuration
+ * fast-context MCP configuration
  */
-export interface ContextWeaverConfig {
-  siliconflowApiKey: string
+export interface FastContextConfig {
+  windsurfApiKey: string
 }
 
 /**
- * Install and configure ContextWeaver MCP for Claude Code
- * ContextWeaver is a local-first semantic code search engine with hybrid search + rerank
+ * Install and configure fast-context MCP for Claude Code
+ * fast-context is an AI-driven semantic code search using Windsurf's Devstral model
  */
-export async function installContextWeaver(config: ContextWeaverConfig): Promise<{ success: boolean, message: string, configPath?: string }> {
-  const { siliconflowApiKey } = config
+export async function installFastContext(config: FastContextConfig): Promise<{ success: boolean, message: string, configPath?: string }> {
+  const { windsurfApiKey } = config
 
   try {
-    // 0. Install contextweaver CLI globally
-    console.log('  ⏳ 正在安装 ContextWeaver CLI...')
-    const { execSync } = await import('node:child_process')
-    try {
-      execSync('npm install -g @hsingjui/contextweaver', { stdio: 'pipe' })
-      console.log('  ✓ ContextWeaver CLI 安装成功')
-    }
-    catch {
-      // Try with sudo on Unix systems
-      if (process.platform !== 'win32') {
-        try {
-          execSync('sudo npm install -g @hsingjui/contextweaver', { stdio: 'pipe' })
-          console.log('  ✓ ContextWeaver CLI 安装成功 (sudo)')
-        }
-        catch {
-          console.log('  ⚠ ContextWeaver CLI 安装失败，请手动运行: npm install -g @hsingjui/contextweaver')
-        }
-      }
-      else {
-        console.log('  ⚠ ContextWeaver CLI 安装失败，请手动运行: npm install -g @hsingjui/contextweaver')
-      }
-    }
-
-    // 1. Create ContextWeaver config directory and .env file
-    const contextWeaverDir = join(homedir(), '.contextweaver')
-    await fs.ensureDir(contextWeaverDir)
-
-    const envContent = `# ContextWeaver 配置 (由 CCG 自动生成)
-
-# Embedding API - 硅基流动
-EMBEDDINGS_API_KEY=${siliconflowApiKey}
-EMBEDDINGS_BASE_URL=https://api.siliconflow.cn/v1/embeddings
-EMBEDDINGS_MODEL=Qwen/Qwen3-Embedding-8B
-EMBEDDINGS_MAX_CONCURRENCY=10
-EMBEDDINGS_DIMENSIONS=1024
-
-# Reranker - 硅基流动
-RERANK_API_KEY=${siliconflowApiKey}
-RERANK_BASE_URL=https://api.siliconflow.cn/v1/rerank
-RERANK_MODEL=Qwen/Qwen3-Reranker-8B
-RERANK_TOP_N=20
-`
-    await fs.writeFile(join(contextWeaverDir, '.env'), envContent, 'utf-8')
-
-    // 2. Read existing Claude Code config
+    // 1. Read existing Claude Code config
     let existingConfig = await readClaudeCodeConfig()
     if (!existingConfig) {
       existingConfig = { mcpServers: {} }
@@ -1168,16 +1126,17 @@ RERANK_TOP_N=20
       }
     }
 
-    // 3. Build ContextWeaver MCP server config
-    const contextWeaverMcpConfig = buildMcpServerConfig({
+    // 2. Build fast-context MCP server config
+    const fastContextMcpConfig = buildMcpServerConfig({
       type: 'stdio' as const,
-      command: 'contextweaver',
-      args: ['mcp'],
+      command: 'npx',
+      args: ['-y', '--prefer-online', '@sammysnake/fast-context-mcp@next'],
+      env: { WINDSURF_API_KEY: windsurfApiKey },
     })
 
-    // 4. Merge into existing config
+    // 3. Merge into existing config
     let mergedConfig = mergeMcpServers(existingConfig, {
-      contextweaver: contextWeaverMcpConfig,
+      'fast-context': fastContextMcpConfig,
     })
 
     // Apply Windows fixes if needed
@@ -1185,48 +1144,44 @@ RERANK_TOP_N=20
       mergedConfig = fixWindowsMcpConfig(mergedConfig)
     }
 
-    // 5. Write config back
+    // 4. Write config back
     await writeClaudeCodeConfig(mergedConfig)
 
     return {
       success: true,
-      message: 'ContextWeaver MCP configured successfully',
+      message: 'fast-context MCP configured successfully',
       configPath: join(homedir(), '.claude.json'),
     }
   }
   catch (error) {
     return {
       success: false,
-      message: `Failed to configure ContextWeaver: ${error}`,
+      message: `Failed to configure fast-context: ${error}`,
     }
   }
 }
 
 /**
- * Uninstall ContextWeaver MCP from Claude Code
+ * Uninstall fast-context MCP from Claude Code
  */
-export async function uninstallContextWeaver(): Promise<{ success: boolean, message: string }> {
+export async function uninstallFastContext(): Promise<{ success: boolean, message: string }> {
   try {
     // 1. Remove from claude.json
     const existingConfig = await readClaudeCodeConfig()
-    if (existingConfig?.mcpServers?.contextweaver) {
-      delete existingConfig.mcpServers.contextweaver
+    if (existingConfig?.mcpServers?.['fast-context']) {
+      delete existingConfig.mcpServers['fast-context']
       await writeClaudeCodeConfig(existingConfig)
     }
 
-    // 2. Optionally remove ~/.contextweaver directory (keep it for now, user might want to keep config)
-    // const contextWeaverDir = join(homedir(), '.contextweaver')
-    // await fs.remove(contextWeaverDir)
-
     return {
       success: true,
-      message: 'ContextWeaver MCP uninstalled successfully',
+      message: 'fast-context MCP uninstalled successfully',
     }
   }
   catch (error) {
     return {
       success: false,
-      message: `Failed to uninstall ContextWeaver: ${error}`,
+      message: `Failed to uninstall fast-context: ${error}`,
     }
   }
 }

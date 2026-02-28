@@ -97,6 +97,7 @@ templates/
 | `{{LITE_MODE_FLAG}}` | Lite 模式标志（`--lite ` 或空） |
 | `{{MCP_SEARCH_TOOL}}` | MCP 搜索工具名 |
 | `{{MCP_SEARCH_PARAM}}` | MCP 搜索参数名 |
+| `{{MCP_PATH_PARAM}}` | MCP 路径参数名 |
 | `~/.claude/...` | 替换为用户主目录的绝对路径 |
 
 ---

@@ -94,7 +94,7 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 ```
 {{MCP_SEARCH_TOOL}}({
   query: "<基于增强后需求构建的语义查询>",
-  project_root_path: "{{WORKDIR}}"
+  {{MCP_PATH_PARAM}}: "{{WORKDIR}}"
 })
 ```
 

@@ -21,7 +21,7 @@ TypeScript CLI 工具，负责 CCG 多模型协作系统的交互式安装、配
 
 1. **一键安装** -- 交互式引导用户完成命令模板、专家提示词、codeagent-wrapper 二进制、MCP 配置的安装
 2. **交互式菜单** -- 提供初始化/更新/卸载/MCP 配置/API 配置/输出风格/实用工具的统一入口
-3. **MCP 工具管理** -- 支持 ContextWeaver / ace-tool / ace-tool-rs 及辅助 MCP（Context7/Playwright/DeepWiki/Exa）
+3. **MCP 工具管理** -- 支持 fast-context / ace-tool / ace-tool-rs 及辅助 MCP（Context7/Playwright/DeepWiki/Exa）
 4. **跨平台适配** -- Windows MCP 命令包装（cmd /c）、路径规范化、Git Bash 兼容
 5. **版本管理** -- 自动检测更新、增量升级工作流模板
 6. **配置迁移** -- v1.3.x -> v1.4.0 目录结构自动迁移
@@ -162,7 +162,7 @@ export { getCurrentVersion, getLatestVersion, checkForUpdates, compareVersions }
 | `init.ts` | 初始化命令（MCP 选择、API 配置、安装流程） |
 | `update.ts` | 更新命令（版本检测、增量升级） |
 | `menu.ts` | 交互式菜单（init/update/config/tools/uninstall/help） |
-| `config-mcp.ts` | MCP 工具配置（ContextWeaver/ace-tool/辅助工具） |
+| `config-mcp.ts` | MCP 工具配置（fast-context/ace-tool/辅助工具） |
 | `diagnose-mcp.ts` | MCP 诊断 + Windows 修复 |
 
 ### 工具层 (`utils/`)

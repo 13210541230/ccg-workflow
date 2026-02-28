@@ -157,7 +157,7 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 ```
 {{MCP_SEARCH_TOOL}}({
   query: "<基于计划内容构建的语义查询，包含关键文件、模块、函数名>",
-  project_root_path: "{{WORKDIR}}"
+  {{MCP_PATH_PARAM}}: "{{WORKDIR}}"
 })
 ```
 

@@ -30,7 +30,7 @@ color: blue
 
 ```
 {{MCP_SEARCH_TOOL}} {
-  "project_root_path": "{{项目路径}}",
+  "{{MCP_PATH_PARAM}}": "{{项目路径}}",
   "query": "{{相关功能关键词}}"
 }
 ```

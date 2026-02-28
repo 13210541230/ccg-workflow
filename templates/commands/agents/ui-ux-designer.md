@@ -31,7 +31,7 @@ color: magenta
 
 ```
 {{MCP_SEARCH_TOOL}} {
-  "project_root_path": "{{项目路径}}",
+  "{{MCP_PATH_PARAM}}": "{{项目路径}}",
   "query": "可复用的 UI 组件、按钮、表单、卡片、布局组件"
 }
 ```

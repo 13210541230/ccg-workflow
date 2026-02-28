@@ -1,7 +1,7 @@
 import ansis from 'ansis'
 import inquirer from 'inquirer'
 import { i18n } from '../i18n'
-import { installAceTool, installAceToolRs, installContextWeaver, installMcpServer, uninstallAceTool, uninstallContextWeaver, uninstallMcpServer } from '../utils/installer'
+import { installAceTool, installAceToolRs, installFastContext, installMcpServer, uninstallAceTool, uninstallFastContext, uninstallMcpServer } from '../utils/installer'
 
 /**
  * Configure MCP tools after installation
@@ -16,7 +16,7 @@ export async function configMcp(): Promise<void> {
     name: 'action',
     message: '选择操作',
     choices: [
-      { name: `${ansis.green('➜')} 代码检索 MCP ${ansis.gray('(ContextWeaver / ace-tool)')}`, value: 'code-retrieval' },
+      { name: `${ansis.green('➜')} 代码检索 MCP ${ansis.gray('(fast-context / ace-tool)')}`, value: 'code-retrieval' },
       { name: `${ansis.blue('➜')} 辅助工具 MCP ${ansis.gray('(context7 / Playwright / exa...)')}`, value: 'auxiliary' },
       { name: `${ansis.red('✕')} 卸载 MCP`, value: 'uninstall' },
       new inquirer.Separator(),
@@ -46,7 +46,7 @@ async function handleCodeRetrieval(): Promise<void> {
     name: 'tool',
     message: '选择代码检索工具',
     choices: [
-      { name: `ContextWeaver ${ansis.green('(推荐)')} ${ansis.gray('- 本地混合搜索')}`, value: 'contextweaver' },
+      { name: `fast-context ${ansis.green('(推荐)')} ${ansis.gray('- AI 语义代码搜索')}`, value: 'fast-context' },
       { name: `ace-tool ${ansis.red('(收费)')} ${ansis.gray('- Node.js')}`, value: 'ace-tool' },
       { name: `ace-tool-rs ${ansis.red('(收费)')} ${ansis.gray('- Rust')}`, value: 'ace-tool-rs' },
       new inquirer.Separator(),
@@ -57,8 +57,8 @@ async function handleCodeRetrieval(): Promise<void> {
   if (tool === 'cancel')
     return
 
-  if (tool === 'contextweaver') {
-    await handleInstallContextWeaver()
+  if (tool === 'fast-context') {
+    await handleInstallFastContext()
   }
   else {
     await handleInstallAceTool(tool === 'ace-tool-rs')
@@ -97,34 +97,61 @@ async function handleInstallAceTool(isRs: boolean): Promise<void> {
   }
 }
 
-async function handleInstallContextWeaver(): Promise<void> {
+async function handleInstallFastContext(): Promise<void> {
   console.log()
-  console.log(ansis.cyan(`📖 获取硅基流动 API Key：`))
-  console.log(`   ${ansis.gray('1.')} 访问 ${ansis.underline('https://siliconflow.cn/')} 注册账号`)
-  console.log(`   ${ansis.gray('2.')} 进入控制台 → API 密钥 → 创建密钥`)
-  console.log(`   ${ansis.gray('3.')} 新用户有免费额度，Embedding + Rerank 完全够用`)
+  console.log(ansis.cyan(`📖 获取 Windsurf API Key：`))
+  console.log(`   ${ansis.gray('1.')} 安装 Windsurf IDE（${ansis.underline('https://windsurf.com/')}）`)
+  console.log(`   ${ansis.gray('2.')} 或手动输入已有的 Windsurf API Key`)
   console.log()
 
-  const { apiKey } = await inquirer.prompt([{
-    type: 'password',
-    name: 'apiKey',
-    message: `硅基流动 API Key ${ansis.gray('(sk-xxx)')}`,
-    mask: '*',
-    validate: (v: string) => v.trim() !== '' || '请输入 API Key',
+  const { method } = await inquirer.prompt([{
+    type: 'list',
+    name: 'method',
+    message: '选择 API Key 获取方式',
+    choices: [
+      { name: `自动提取 ${ansis.green('(推荐)')} ${ansis.gray('- 从本地 Windsurf 安装提取')}`, value: 'auto' },
+      { name: `手动输入 ${ansis.gray('- 直接输入 API Key')}`, value: 'manual' },
+    ],
   }])
 
-  console.log()
-  console.log(ansis.yellow('⏳ 正在配置 ContextWeaver MCP...'))
+  let apiKey = ''
+  if (method === 'manual') {
+    const { key } = await inquirer.prompt([{
+      type: 'password',
+      name: 'key',
+      message: `Windsurf API Key ${ansis.gray('(sk-ws-xxx)')}`,
+      mask: '*',
+      validate: (v: string) => v.trim() !== '' || '请输入 API Key',
+    }])
+    apiKey = key.trim()
+  }
+  else {
+    console.log()
+    console.log(ansis.yellow('⏳ 正在从 Windsurf 提取 API Key...'))
+    console.log(ansis.gray('  请确保 Windsurf IDE 已安装并登录'))
+    // 用户需要自行通过 extract_windsurf_key 工具或手动获取
+    const { key } = await inquirer.prompt([{
+      type: 'password',
+      name: 'key',
+      message: `自动提取失败？请手动输入 Windsurf API Key`,
+      mask: '*',
+      validate: (v: string) => v.trim() !== '' || '请输入 API Key',
+    }])
+    apiKey = key.trim()
+  }
 
-  const result = await installContextWeaver({ siliconflowApiKey: apiKey.trim() })
+  console.log()
+  console.log(ansis.yellow('⏳ 正在配置 fast-context MCP...'))
+
+  const result = await installFastContext({ windsurfApiKey: apiKey })
 
   console.log()
   if (result.success) {
-    console.log(ansis.green('✓ ContextWeaver MCP 配置成功！'))
+    console.log(ansis.green('✓ fast-context MCP 配置成功！'))
     console.log(ansis.gray('  重启 Claude Code CLI 使配置生效'))
   }
   else {
-    console.log(ansis.red(`✗ ContextWeaver MCP 配置失败: ${result.message}`))
+    console.log(ansis.red(`✗ fast-context MCP 配置失败: ${result.message}`))
   }
 }
 
@@ -195,7 +222,7 @@ async function handleUninstall(): Promise<void> {
 
   const allMcps = [
     { name: 'ace-tool', value: 'ace-tool' },
-    { name: 'ContextWeaver', value: 'contextweaver' },
+    { name: 'fast-context', value: 'fast-context' },
     ...AUXILIARY_MCPS.map(m => ({ name: m.name, value: m.id })),
   ]
 
@@ -220,8 +247,8 @@ async function handleUninstall(): Promise<void> {
     if (target === 'ace-tool') {
       result = await uninstallAceTool()
     }
-    else if (target === 'contextweaver') {
-      result = await uninstallContextWeaver()
+    else if (target === 'fast-context') {
+      result = await uninstallFastContext()
     }
     else {
       result = await uninstallMcpServer(target)
