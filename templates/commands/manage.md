@@ -17,6 +17,30 @@ $ARGUMENTS
 - **源码隔离**：主Agent**禁止**直接使用 Edit/Write 修改项目源代码文件。仅允许修改 `.claude/plan/` 下的状态文件。所有源码修改必须通过 execute-worker 子Agent 完成。**自检规则**：如果你即将调用 Edit/Write 修改非 `.claude/plan/` 路径的文件，立即停止，改为 spawn 对应 worker 子Agent
 - **止损机制**：当前阶段输出通过验证前，不进入下一阶段
 - **状态驱动**：所有进度通过 planning-with-files 状态文件追踪，确保可恢复、可审计
+- **Hooks 自动保障**：插件 hooks 在 Task 工具调用前后自动注入状态提醒，防止遗漏状态更新（详见「Hooks 自动化保障」章节）
+
+---
+
+## Hooks 自动化保障
+
+CCG 插件通过 `hooks.json` 注册了 3 类 hooks，自动保障 manage 工作流的状态文件更新：
+
+| Hook 类型 | 触发时机 | 作用 |
+|-----------|----------|------|
+| **PreToolUse** (`Task\|TaskCreate`) | 每次 spawn/wait 子Agent 前 | 注入当前 progress.md 状态到上下文，防止主Agent丢失进度感知 |
+| **PostToolUse** (`Task\|TaskOutput`) | 每次子Agent 返回后 | 输出「阶段完成后处理协议」清单提醒，确保 6 步不遗漏 |
+| **Stop** | 会话结束时 | 检测未完成任务并警告，防止意外中断丢失进度 |
+
+**工作原理**：
+- Hooks 通过检测 `.claude/plan/*/progress.md` 是否存在未完成任务来决定是否激活
+- 已完成的任务（状态为 `complete`）不会触发 hooks
+- Hooks 仅输出提醒信息，不修改任何文件，实际更新仍由主Agent执行
+- 脚本路径：`$CLAUDE_PLUGIN_ROOT/scripts/manage-*.sh`
+
+**与手动指令的关系**：
+- Hooks 是**安全网**，不是替代品。「阶段完成后处理协议」仍是权威参考
+- 即使 hooks 未触发（如无活跃会话），主Agent 仍应按协议执行
+- Hooks 的提醒内容与协议步骤一一对应，便于对照执行
 
 ---
 
@@ -259,9 +283,11 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 ---
 
-## 阶段完成后处理协议（强制执行）
+## 阶段完成后处理协议（强制执行，Hooks 自动提醒）
 
-每个子Agent返回后，主Agent必须按以下顺序执行所有步骤，不得跳过：
+每个子Agent返回后，主Agent必须按以下顺序执行所有步骤，不得跳过。
+
+> **Hooks 保障**：PostToolUse hook 会在每次 TaskOutput 返回后自动输出以下 6 步清单。如果你看到 `[ccg:manage] Worker returned. Execute post-phase protocol NOW:` 提醒，立即按顺序执行。
 
 ### 步骤 1：提取过程日志
 从子Agent输出的「### 过程日志」部分提取内容，追加到 `findings.md` 对应阶段小节（Phase N 分析/规划/实施/审查/测试）。若子Agent未输出过程日志，跳过此步。
@@ -311,6 +337,22 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 ### Phase 0：初始化
 
 `[模式：初始化]`
+
+#### 0.0 会话恢复检测（必须最先执行）
+
+检查是否存在未完成的 manage 会话：
+
+```
+Glob({ pattern: ".claude/plan/*/progress.md" })
+```
+
+若找到未完成会话（状态非 `complete`）：
+1. 读取该会话的所有状态文件（`progress.md`、`task_plan.md`、`findings.md`、`decisions.md`）
+2. 向用户展示当前进度：`"检测到未完成的 manage 会话：<task-name>，当前状态：<status>。是否继续？"`
+3. 用户确认继续 → 从中断的阶段恢复执行（根据 progress.md 的状态字段决定恢复点）
+4. 用户选择新建 → 正常进入 Phase 0.1
+
+若无未完成会话 → 正常进入 Phase 0.1
 
 #### 0.1 Prompt 增强（必须首先执行）
 
