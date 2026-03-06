@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# run-wrapper: cross-platform binary selector for codeagent-wrapper
+# Detects OS/arch and executes the correct binary from plugin root
+
+# Allow override via env var
+if [[ -n "${CCG_WRAPPER_BIN:-}" ]]; then
+  exec "${CCG_WRAPPER_BIN}" "$@"
+fi
+
+# Resolve plugin root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+
+# Detect OS
+OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+case "${OS}" in
+  linux*)   OS_NAME="linux" ;;
+  darwin*)  OS_NAME="darwin" ;;
+  msys*|mingw*|cygwin*) OS_NAME="windows" ;;
+  *)
+    echo "[run-wrapper] unsupported OS: ${OS}" >&2
+    exit 1
+    ;;
+esac
+
+# Detect arch
+ARCH="$(uname -m | tr '[:upper:]' '[:lower:]')"
+case "${ARCH}" in
+  x86_64|amd64) ARCH_NAME="amd64" ;;
+  arm64|aarch64) ARCH_NAME="arm64" ;;
+  *)
+    echo "[run-wrapper] unsupported arch: ${ARCH}" >&2
+    exit 1
+    ;;
+esac
+
+# Compose binary path
+BINARY_PATH="${PLUGIN_ROOT}/bin/codeagent-wrapper-${OS_NAME}-${ARCH_NAME}"
+if [[ "${OS_NAME}" == "windows" ]]; then
+  BINARY_PATH="${BINARY_PATH}.exe"
+fi
+
+# Verify binary exists
+if [[ ! -f "${BINARY_PATH}" ]]; then
+  echo "[run-wrapper] binary not found: ${BINARY_PATH}" >&2
+  exit 1
+fi
+
+# Ensure executable permission (may be lost after plugin cache copy)
+if [[ "${OS_NAME}" != "windows" ]]; then
+  chmod +x "${BINARY_PATH}" 2>/dev/null || true
+fi
+
+exec "${BINARY_PATH}" "$@"

@@ -1,0 +1,14 @@
+{
+  "name": "ccg-local",
+  "owner": {
+    "name": "CCG Contributors"
+  },
+  "plugins": [
+    {
+      "name": "ccg",
+      "source": "./",
+      "description": "CCG Multi-Model Collaboration System - Claude + Codex + Gemini workflow orchestration",
+      "version": "0.0.0"
+    }
+  ]
+}

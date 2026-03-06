@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "test -n \"${CLAUDE_PLUGIN_ROOT:-}\" && echo 'CCG plugin root: '\"$CLAUDE_PLUGIN_ROOT\" || echo 'WARNING: CLAUDE_PLUGIN_ROOT not set'"
+          }
+        ]
+      }
+    ]
+  }
+}

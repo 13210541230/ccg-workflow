@@ -64,14 +64,20 @@
     "templates/prompts/gemini/tester.md",
     "templates/prompts/claude/",
     "templates/output-styles/",
-    "templates/bin/codeagent-persist.sh"
+    "templates/bin/codeagent-persist.sh",
+    "templates/bin/run-wrapper",
+    "templates/plugin/",
+    "templates/commands/manage.md",
+    "scripts/build-plugin.mjs"
   ],
   "scripts": {
     "dev": "tsx src/cli.ts",
     "build": "unbuild",
+    "build:plugin": "node scripts/build-plugin.mjs --verbose",
+    "build:all": "pnpm build && pnpm build:plugin",
     "start": "node bin/ccg.mjs",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm build",
+    "prepublishOnly": "pnpm build:all",
     "lint": "eslint",
     "lint:fix": "eslint --fix"
   },

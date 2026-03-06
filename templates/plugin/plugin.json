@@ -1,0 +1,11 @@
+{
+  "name": "ccg",
+  "version": "0.0.0",
+  "description": "CCG Multi-Model Collaboration System - Claude + Codex + Gemini workflow orchestration",
+  "author": {
+    "name": "CCG Contributors"
+  },
+  "repository": "https://github.com/anthropics/ccg-workflow",
+  "license": "MIT",
+  "keywords": ["multi-model", "codex", "gemini", "workflow", "collaboration"]
+}

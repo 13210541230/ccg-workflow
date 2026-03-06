@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "fast-context": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/start-mcp.mjs", "fast-context"],
+      "env": {
+        "WINDSURF_API_KEY": "${WINDSURF_API_KEY}"
+      }
+    },
+    "sequential-thinking": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/start-mcp.mjs", "sequential-thinking"]
+    }
+  }
+}
