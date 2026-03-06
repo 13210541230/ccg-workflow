@@ -54,3 +54,5 @@ WINDOWS_FIX.md
 
 # Old package tarballs
 *.tgz
+.codex
+.claude
