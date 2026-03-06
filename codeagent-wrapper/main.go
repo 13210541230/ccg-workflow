@@ -368,6 +368,12 @@ func run() (exitCode int) {
 	}
 	logInfo(fmt.Sprintf("Selected backend: %s", backend.Name()))
 
+	// Set CCG_BACKEND env var for ROLE_FILE path expansion
+	// This allows templates to use $CCG_BACKEND in ROLE_FILE paths
+	if os.Getenv("CCG_BACKEND") == "" {
+		os.Setenv("CCG_BACKEND", backend.Name())
+	}
+
 	// Log model parameter usage
 	if cfg.GeminiModel != "" && cfg.Backend == "gemini" {
 		logInfo(fmt.Sprintf("Using Gemini model: %s", cfg.GeminiModel))

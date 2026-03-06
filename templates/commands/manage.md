@@ -76,7 +76,7 @@ CCG 插件通过 `hooks.json` 注册了 3 类 hooks，自动保障 manage 工作
 ```
 # 新会话调用
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 需求：<增强后的需求>
@@ -91,7 +91,7 @@ EOF",
 
 # 复用会话调用
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex resume <SESSION_ID> - \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} resume <SESSION_ID> - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 需求：<增强后的需求>
@@ -109,11 +109,11 @@ EOF",
 
 | 阶段 | Codex-A | Codex-B |
 |------|---------|---------|
-| 分析 | `~/.claude/.ccg/prompts/codex/analyzer.md` | `~/.claude/.ccg/prompts/codex/analyzer.md` |
-| 规划 | `~/.claude/.ccg/prompts/codex/architect.md` | `~/.claude/.ccg/prompts/codex/architect.md` |
-| 实施 | `~/.claude/.ccg/prompts/codex/architect.md` | `~/.claude/.ccg/prompts/codex/architect.md` |
-| 审查 | `~/.claude/.ccg/prompts/codex/reviewer.md` | `~/.claude/.ccg/prompts/codex/reviewer.md` |
-| 测试 | `~/.claude/.ccg/prompts/codex/tester.md` | `~/.claude/.ccg/prompts/codex/tester.md` |
+| 分析 | `~/.claude/.ccg/prompts//analyzer.md` | `~/.claude/.ccg/prompts//analyzer.md` |
+| 规划 | `~/.claude/.ccg/prompts//architect.md` | `~/.claude/.ccg/prompts//architect.md` |
+| 实施 | `~/.claude/.ccg/prompts//architect.md` | `~/.claude/.ccg/prompts//architect.md` |
+| 审查 | `~/.claude/.ccg/prompts//reviewer.md` | `~/.claude/.ccg/prompts//reviewer.md` |
+| 测试 | `~/.claude/.ccg/prompts//tester.md` | `~/.claude/.ccg/prompts//tester.md` |
 
 **会话复用**：每次调用返回 `SESSION_ID: xxx`，后续阶段用 `resume xxx` 子命令复用上下文（注意：是 `resume`，不是 `--resume`）。
 
@@ -833,8 +833,8 @@ Task({
 
 Codex-A（逻辑分析）:
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"$(pwd)\" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/codex/analyzer.md
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - \"$(pwd)\" <<'EOF'
+ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/analyzer.md
 <TASK>
 需求：{{TASK_CONTENT}}
 上下文：<检索到的代码上下文>
@@ -849,8 +849,8 @@ EOF",
 
 Codex-B（架构分析）:
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"$(pwd)\" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/codex/analyzer.md
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - \"$(pwd)\" <<'EOF'
+ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/analyzer.md
 <TASK>
 需求：{{TASK_CONTENT}}
 上下文：<检索到的代码上下文>
@@ -946,8 +946,8 @@ TaskOutput({ task_id: "<codex_b_task_id>", block: true, timeout: 600000 })
 
 Codex-A（后端规划）:
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex resume {{CODEX_SESSION}} - \"$(pwd)\" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/codex/architect.md
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} resume {{CODEX_SESSION}} - \"$(pwd)\" <<'EOF'
+ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/architect.md
 <TASK>
 需求：{{TASK_CONTENT}}
 上下文：{{ANALYZE_FINDINGS}}
@@ -962,8 +962,8 @@ EOF",
 
 Codex-B（架构规划）:
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex resume {{CODEX_B_SESSION}} - \"$(pwd)\" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/codex/architect.md
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} resume {{CODEX_B_SESSION}} - \"$(pwd)\" <<'EOF'
+ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/architect.md
 <TASK>
 需求：{{TASK_CONTENT}}
 上下文：{{ANALYZE_FINDINGS}}
@@ -1073,8 +1073,8 @@ Read({ file_path: "{{PLAN_DIR}}/decisions.md" })
 **步骤 1：获取原型**
 
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex resume {{CODEX_SESSION}} - \"$(pwd)\" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/codex/architect.md
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} resume {{CODEX_SESSION}} - \"$(pwd)\" <<'EOF'
+ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/architect.md
 <TASK>
 需求：{{TASK_CONTENT}}
 上下文：{{PLAN_CONTENT}}
@@ -1171,8 +1171,8 @@ TaskOutput({ task_id: "<codex_task_id>", block: true, timeout: 600000 })
 
 Codex-A（安全 + 性能 + 逻辑正确性）:
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex resume {{CODEX_SESSION}} - \"$(pwd)\" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/codex/reviewer.md
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} resume {{CODEX_SESSION}} - \"$(pwd)\" <<'EOF'
+ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/reviewer.md
 <TASK>
 审查以下代码变更：
 {{DIFF_CONTENT}}
@@ -1190,8 +1190,8 @@ EOF",
 
 Codex-B（架构一致性 + 代码质量）:
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex resume {{CODEX_B_SESSION}} - \"$(pwd)\" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/codex/reviewer.md
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} resume {{CODEX_B_SESSION}} - \"$(pwd)\" <<'EOF'
+ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/reviewer.md
 <TASK>
 审查以下代码变更：
 {{DIFF_CONTENT}}
@@ -1290,8 +1290,8 @@ TaskOutput({ task_id: "<codex_b_task_id>", block: true, timeout: 600000 })
 **步骤 1：生成测试**
 
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"$(pwd)\" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/codex/tester.md
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - \"$(pwd)\" <<'EOF'
+ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/tester.md
 <TASK>
 为以下文件生成测试：
 {{CHANGED_FILES}}

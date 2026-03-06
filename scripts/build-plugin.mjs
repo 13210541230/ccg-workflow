@@ -45,7 +45,7 @@ const INSTALL_VAR_RULES = [
   { pattern: /\{\{FRONTEND_MODELS\}\}/g, replacement: '["codex"]' },
   { pattern: /\{\{FRONTEND_PRIMARY\}\}/g, replacement: 'codex' },
   { pattern: /\{\{BACKEND_MODELS\}\}/g, replacement: '["codex"]' },
-  { pattern: /\{\{BACKEND_PRIMARY\}\}/g, replacement: 'codex' },
+  { pattern: /\{\{BACKEND_PRIMARY\}\}/g, replacement: '${CCG_BACKEND:-codex}' },
   { pattern: /\{\{REVIEW_MODELS\}\}/g, replacement: '["codex","codex"]' },
   { pattern: /\{\{ROUTING_MODE\}\}/g, replacement: 'smart' },
 ]

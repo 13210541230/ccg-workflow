@@ -32,8 +32,8 @@ description: '多模型调试：Codex 后端诊断 + Codex 架构诊断，交叉
 
 **Codex 后端诊断**：
 ```bash
-~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - "$(pwd)" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/codex/debugger.md
+~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - "$(pwd)" <<'EOF'
+ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/debugger.md
 <TASK>
 需求：<增强后的需求>
 上下文：<错误日志、堆栈信息、复现步骤>
@@ -45,8 +45,8 @@ EOF
 
 **Codex 架构诊断**：
 ```bash
-~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - "$(pwd)" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/codex/debugger.md
+~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - "$(pwd)" <<'EOF'
+ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/debugger.md
 <TASK>
 需求：<增强后的需求>
 上下文：<错误日志、堆栈信息、复现步骤>
@@ -60,8 +60,8 @@ EOF
 
 | 模型 | 提示词 |
 |------|--------|
-| Codex-A | `~/.claude/.ccg/prompts/codex/debugger.md` |
-| Codex-B | `~/.claude/.ccg/prompts/codex/debugger.md` |
+| Codex-A | `~/.claude/.ccg/prompts//debugger.md` |
+| Codex-B | `~/.claude/.ccg/prompts//debugger.md` |
 
 **并行调用**：
 1. 使用 `Bash` 工具，设置 `run_in_background: true` 和 `timeout: 600000`（10 分钟）
@@ -156,12 +156,12 @@ EOF
 
 **⚠️ 必须发起两个并行 Bash 调用**（参照上方调用规范）：
 
-1. **Codex 后端诊断**：`Bash({ command: "...--backend codex...", run_in_background: true })`
-   - ROLE_FILE: `~/.claude/.ccg/prompts/codex/debugger.md`
+1. **Codex 后端诊断**：`Bash({ command: "...--backend ${CCG_BACKEND:-codex}...", run_in_background: true })`
+   - ROLE_FILE: `~/.claude/.ccg/prompts/$CCG_BACKEND/debugger.md`
    - OUTPUT：诊断假设（按可能性排序），每个假设包含原因、证据、修复建议
 
-2. **Codex 架构诊断**：`Bash({ command: "...--backend codex...", run_in_background: true })`
-   - ROLE_FILE: `~/.claude/.ccg/prompts/codex/debugger.md`
+2. **Codex 架构诊断**：`Bash({ command: "...--backend ${CCG_BACKEND:-codex}...", run_in_background: true })`
+   - ROLE_FILE: `~/.claude/.ccg/prompts/$CCG_BACKEND/debugger.md`
    - OUTPUT：诊断假设（按可能性排序），每个假设包含原因、证据、修复建议
 
 用 `TaskOutput` 等待两个模型的诊断结果。**必须等所有模型返回后才能进入下一阶段**。

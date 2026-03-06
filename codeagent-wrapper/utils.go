@@ -96,6 +96,9 @@ func injectRoleFile(taskText string) (string, error) {
 			filePath = filepath.Join(home, filePath[2:])
 		}
 
+		// Expand environment variables (e.g., $CCG_BACKEND)
+		filePath = os.ExpandEnv(filePath)
+
 		// Windows-specific: Convert Git Bash paths to native Windows paths
 		// Only applies when running on Windows (isWindows() check)
 		if isWindows() {

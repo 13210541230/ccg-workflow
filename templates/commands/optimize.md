@@ -39,7 +39,7 @@ description: '多模型性能优化：Codex 后端优化 + Codex 架构优化'
 
 ```
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 需求：<增强后的需求（如未增强则用 $ARGUMENTS）>
@@ -57,8 +57,8 @@ EOF",
 
 | 模型 | 提示词 |
 |------|--------|
-| Codex-A | `~/.claude/.ccg/prompts/codex/optimizer.md` |
-| Codex-B | `~/.claude/.ccg/prompts/codex/optimizer.md` |
+| Codex-A | `~/.claude/.ccg/prompts//optimizer.md` |
+| Codex-B | `~/.claude/.ccg/prompts//optimizer.md` |
 
 **并行调用**：使用 `run_in_background: true` 启动，用 `TaskOutput` 等待结果。**必须等所有模型返回后才能进入下一阶段**。
 
@@ -112,13 +112,13 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 **⚠️ 必须发起两个并行 Bash 调用**（参照上方调用规范）：
 
-1. **Codex 后端分析**：`Bash({ command: "...--backend codex...", run_in_background: true })`
-   - ROLE_FILE: `~/.claude/.ccg/prompts/codex/optimizer.md`
+1. **Codex 后端分析**：`Bash({ command: "...--backend ${CCG_BACKEND:-codex}...", run_in_background: true })`
+   - ROLE_FILE: `~/.claude/.ccg/prompts/$CCG_BACKEND/optimizer.md`
    - 需求：分析后端性能问题（$ARGUMENTS）
    - OUTPUT：性能瓶颈列表、优化方案、预期收益
 
-2. **Codex 架构分析**：`Bash({ command: "...--backend codex...", run_in_background: true })`
-   - ROLE_FILE: `~/.claude/.ccg/prompts/codex/optimizer.md`
+2. **Codex 架构分析**：`Bash({ command: "...--backend ${CCG_BACKEND:-codex}...", run_in_background: true })`
+   - ROLE_FILE: `~/.claude/.ccg/prompts/$CCG_BACKEND/optimizer.md`
    - 需求：分析架构性能问题（设计模式、可扩展性、系统优化）
    - OUTPUT：性能瓶颈列表、优化方案、预期收益
 

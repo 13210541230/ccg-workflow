@@ -34,7 +34,7 @@ description: '多模型技术分析（并行执行）：Codex 双视角并行分
 
 ```
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 需求：<增强后的需求（如未增强则用 $ARGUMENTS）>
@@ -52,8 +52,8 @@ EOF",
 
 | 模型 | 提示词 |
 |------|--------|
-| Codex (逻辑) | `~/.claude/.ccg/prompts/codex/analyzer.md` |
-| Codex (架构) | `~/.claude/.ccg/prompts/codex/analyzer.md` |
+| Codex (逻辑) | `~/.claude/.ccg/prompts//analyzer.md` |
+| Codex (架构) | `~/.claude/.ccg/prompts//analyzer.md` |
 
 **并行调用**：使用 `run_in_background: true` 启动，用 `TaskOutput` 等待结果。**必须等所有模型返回后才能进入下一阶段**。
 
@@ -101,12 +101,12 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 **⚠️ 必须发起两个并行 Bash 调用**（参照上方调用规范）：
 
-1. **Codex 后端分析**：`Bash({ command: "...--backend codex...", run_in_background: true })`
-   - ROLE_FILE: `~/.claude/.ccg/prompts/codex/analyzer.md`
+1. **Codex 后端分析**：`Bash({ command: "...--backend ${CCG_BACKEND:-codex}...", run_in_background: true })`
+   - ROLE_FILE: `~/.claude/.ccg/prompts/$CCG_BACKEND/analyzer.md`
    - OUTPUT：技术可行性、架构影响、性能考量
 
-2. **Codex 架构分析**：`Bash({ command: "...--backend codex...", run_in_background: true })`
-   - ROLE_FILE: `~/.claude/.ccg/prompts/codex/analyzer.md`
+2. **Codex 架构分析**：`Bash({ command: "...--backend ${CCG_BACKEND:-codex}...", run_in_background: true })`
+   - ROLE_FILE: `~/.claude/.ccg/prompts/$CCG_BACKEND/analyzer.md`
    - OUTPUT：架构影响、设计模式、可维护性考量
 
 用 `TaskOutput` 等待两个模型的完整结果。**必须等所有模型返回后才能进入下一阶段**。

@@ -23,12 +23,12 @@ description: 'Agent Teams 规划 - Lead 调用 Codex 并行分析，产出零决
 2. **多模型并行分析（PARALLEL）**
    - **CRITICAL**: 必须在一条消息中同时发起两个 Bash 调用，`run_in_background: true`。
    - **工作目录**：`{{WORKDIR}}` 替换为目标工作目录的绝对路径。
-   - **会话复用**：若步骤 1 获取到 `CODEX_RESEARCH_SESSION`，在命令中使用 `resume <SESSION_ID>` 替代新会话（将 `--backend codex -` 改为 `--backend codex resume <SESSION_ID> -`）。
+   - **会话复用**：若步骤 1 获取到 `CODEX_RESEARCH_SESSION`，在命令中使用 `resume <SESSION_ID>` 替代新会话（将 `--backend ${CCG_BACKEND:-codex} -` 改为 `--backend ${CCG_BACKEND:-codex} resume <SESSION_ID> -`）。
 
    **FIRST Bash call (Codex)**（若有 SESSION_ID 则 resume，否则新会话）:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex [resume <CODEX_RESEARCH_SESSION>] - \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/codex/analyzer.md\n<TASK>\n需求：$ARGUMENTS\n上下文：<步骤1收集的项目结构和关键代码>\n</TASK>\nOUTPUT:\n1) 技术可行性评估\n2) 推荐架构方案（精确到文件和函数）\n3) 详细实施步骤\n4) 风险评估\nEOF",
+     command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} [resume <CODEX_RESEARCH_SESSION>] - \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/analyzer.md\n<TASK>\n需求：$ARGUMENTS\n上下文：<步骤1收集的项目结构和关键代码>\n</TASK>\nOUTPUT:\n1) 技术可行性评估\n2) 推荐架构方案（精确到文件和函数）\n3) 详细实施步骤\n4) 风险评估\nEOF",
      run_in_background: true,
      timeout: 3600000,
      description: "Codex 后端分析"
@@ -38,7 +38,7 @@ description: 'Agent Teams 规划 - Lead 调用 Codex 并行分析，产出零决
    **SECOND Bash call (Codex) - IN THE SAME MESSAGE**（若有 SESSION_ID 则 resume，否则新会话）:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex [resume <CODEX_B_RESEARCH_SESSION>] - \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/codex/analyzer.md\n<TASK>\n需求：$ARGUMENTS\n上下文：<步骤1收集的项目结构和关键代码>\n</TASK>\nOUTPUT:\n1) 架构设计方案\n2) 组件拆分建议（精确到文件和函数）\n3) 详细实施步骤\n4) 设计要点\nEOF",
+     command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} [resume <CODEX_B_RESEARCH_SESSION>] - \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/analyzer.md\n<TASK>\n需求：$ARGUMENTS\n上下文：<步骤1收集的项目结构和关键代码>\n</TASK>\nOUTPUT:\n1) 架构设计方案\n2) 组件拆分建议（精确到文件和函数）\n3) 详细实施步骤\n4) 设计要点\nEOF",
      run_in_background: true,
      timeout: 3600000,
      description: "Codex 架构分析"

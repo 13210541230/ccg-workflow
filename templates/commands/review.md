@@ -29,7 +29,7 @@ description: '多模型代码审查：无参数时自动审查 git diff，双模
 
 ```
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 审查以下代码变更：
@@ -47,8 +47,8 @@ EOF",
 
 | 模型 | 提示词 |
 |------|--------|
-| Codex-A | `~/.claude/.ccg/prompts/codex/reviewer.md` |
-| Codex-B | `~/.claude/.ccg/prompts/codex/reviewer.md` |
+| Codex-A | `~/.claude/.ccg/prompts//reviewer.md` |
+| Codex-B | `~/.claude/.ccg/prompts//reviewer.md` |
 
 **并行调用**：使用 `run_in_background: true` 启动，用 `TaskOutput` 等待结果。**必须等所有模型返回后才能进入下一阶段**。
 
@@ -92,13 +92,13 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 **⚠️ 必须发起两个并行 Bash 调用**（参照上方调用规范）：
 
-1. **Codex 后端审查**：`Bash({ command: "...--backend codex...", run_in_background: true })`
-   - ROLE_FILE: `~/.claude/.ccg/prompts/codex/reviewer.md`
+1. **Codex 后端审查**：`Bash({ command: "...--backend ${CCG_BACKEND:-codex}...", run_in_background: true })`
+   - ROLE_FILE: `~/.claude/.ccg/prompts/$CCG_BACKEND/reviewer.md`
    - 需求：审查代码变更（git diff 内容）
    - OUTPUT：按 Critical/Major/Minor/Suggestion 分类列出安全性、性能、错误处理问题
 
-2. **Codex 架构审查**：`Bash({ command: "...--backend codex...", run_in_background: true })`
-   - ROLE_FILE: `~/.claude/.ccg/prompts/codex/reviewer.md`
+2. **Codex 架构审查**：`Bash({ command: "...--backend ${CCG_BACKEND:-codex}...", run_in_background: true })`
+   - ROLE_FILE: `~/.claude/.ccg/prompts/$CCG_BACKEND/reviewer.md`
    - 需求：审查代码变更（git diff 内容）
    - OUTPUT：按 Critical/Major/Minor/Suggestion 分类列出架构、可维护性、设计一致性问题
 

@@ -39,7 +39,7 @@ description: '前端专项工作流（研究→构思→计划→执行→优化
 ```
 # 新会话调用
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 需求：<增强后的需求（如未增强则用 $ARGUMENTS）>
@@ -54,7 +54,7 @@ EOF",
 
 # 复用会话调用
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex resume <SESSION_ID> - \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} resume <SESSION_ID> - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 需求：<增强后的需求（如未增强则用 $ARGUMENTS）>
@@ -72,9 +72,9 @@ EOF",
 
 | 阶段 | Codex |
 |------|-------|
-| 分析 | `~/.claude/.ccg/prompts/codex/analyzer.md` |
-| 规划 | `~/.claude/.ccg/prompts/codex/architect.md` |
-| 审查 | `~/.claude/.ccg/prompts/codex/reviewer.md` |
+| 分析 | `~/.claude/.ccg/prompts//analyzer.md` |
+| 规划 | `~/.claude/.ccg/prompts//architect.md` |
+| 审查 | `~/.claude/.ccg/prompts//reviewer.md` |
 
 **会话复用**：每次调用返回 `SESSION_ID: xxx`，后续阶段用 `resume xxx` 复用上下文。阶段 2 保存 `CODEX_SESSION`，阶段 3 和 5 使用 `resume` 复用。
 
@@ -106,7 +106,7 @@ EOF",
 `[模式：构思]` - Codex 主导分析
 
 **必须调用 Codex**（参照上方调用规范）：
-- ROLE_FILE: `~/.claude/.ccg/prompts/codex/analyzer.md`
+- ROLE_FILE: `~/.claude/.ccg/prompts/$CCG_BACKEND/analyzer.md`
 - 需求：增强后的需求（如未增强则用 $ARGUMENTS）
 - 上下文：阶段 1 收集的项目上下文
 - OUTPUT: UI 可行性分析、推荐方案（至少 2 个）、用户体验评估
@@ -120,7 +120,7 @@ EOF",
 `[模式：计划]` - Codex 主导规划
 
 **必须调用 Codex**（使用 `resume <CODEX_SESSION>` 复用会话）：
-- ROLE_FILE: `~/.claude/.ccg/prompts/codex/architect.md`
+- ROLE_FILE: `~/.claude/.ccg/prompts/$CCG_BACKEND/architect.md`
 - 需求：用户选择的方案
 - 上下文：阶段 2 的分析结果
 - OUTPUT: 组件结构、UI 流程、样式方案
@@ -140,7 +140,7 @@ Claude 综合规划，请求用户批准后存入 `.claude/plan/任务名.md`
 `[模式：优化]` - Codex 主导审查
 
 **必须调用 Codex**（参照上方调用规范）：
-- ROLE_FILE: `~/.claude/.ccg/prompts/codex/reviewer.md`
+- ROLE_FILE: `~/.claude/.ccg/prompts/$CCG_BACKEND/reviewer.md`
 - 需求：审查以下前端代码变更
 - 上下文：git diff 或代码内容
 - OUTPUT: 可访问性、响应式、性能、设计一致性问题列表

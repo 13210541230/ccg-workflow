@@ -30,7 +30,7 @@ description: '多模型分析 → 消除歧义 → 零决策可执行计划'
    **FIRST Bash call (Codex)**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --backend codex - \"{{WORKDIR}}\" <<'EOF'\nAnalyze change <change_id> from backend perspective:\n- Implementation approach\n- Technical risks\n- Alternative architectures\n- Edge cases and failure modes\nOUTPUT: JSON with analysis\nEOF",
+     command: "~/.claude/bin/codeagent-wrapper --backend ${CCG_BACKEND:-codex} - \"{{WORKDIR}}\" <<'EOF'\nAnalyze change <change_id> from backend perspective:\n- Implementation approach\n- Technical risks\n- Alternative architectures\n- Edge cases and failure modes\nOUTPUT: JSON with analysis\nEOF",
      run_in_background: true,
      timeout: 300000,
      description: "Codex: backend analysis"
@@ -40,7 +40,7 @@ description: '多模型分析 → 消除歧义 → 零决策可执行计划'
    **SECOND Bash call (Codex) - IN THE SAME MESSAGE**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --backend codex - \"{{WORKDIR}}\" <<'EOF'\nAnalyze change <change_id> from architecture/design perspective:\n- Maintainability assessment\n- Scalability considerations\n- Integration conflicts\nOUTPUT: JSON with analysis\nEOF",
+     command: "~/.claude/bin/codeagent-wrapper --backend ${CCG_BACKEND:-codex} - \"{{WORKDIR}}\" <<'EOF'\nAnalyze change <change_id> from architecture/design perspective:\n- Maintainability assessment\n- Scalability considerations\n- Integration conflicts\nOUTPUT: JSON with analysis\nEOF",
      run_in_background: true,
      timeout: 300000,
      description: "Codex: architecture analysis"

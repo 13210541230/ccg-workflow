@@ -21,7 +21,7 @@ $ARGUMENTS
 ```
 # 新会话调用
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 需求：<增强后的需求（如未增强则用 $ARGUMENTS）>
@@ -36,7 +36,7 @@ EOF",
 
 # 复用会话调用
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex resume <SESSION_ID> - \"{{WORKDIR}}\" <<'EOF'
+  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} resume <SESSION_ID> - \"{{WORKDIR}}\" <<'EOF'
 ROLE_FILE: <角色提示词路径>
 <TASK>
 需求：<增强后的需求（如未增强则用 $ARGUMENTS）>
@@ -54,10 +54,10 @@ EOF",
 
 | 阶段 | Codex-A | Codex-B |
 |------|---------|---------|
-| 分析 | `~/.claude/.ccg/prompts/codex/analyzer.md` | `~/.claude/.ccg/prompts/codex/analyzer.md` |
-| 规划 | `~/.claude/.ccg/prompts/codex/architect.md` | `~/.claude/.ccg/prompts/codex/architect.md` |
-| 实施 | `~/.claude/.ccg/prompts/codex/architect.md` | `~/.claude/.ccg/prompts/codex/architect.md` |
-| 审查 | `~/.claude/.ccg/prompts/codex/reviewer.md` | `~/.claude/.ccg/prompts/codex/reviewer.md` |
+| 分析 | `~/.claude/.ccg/prompts//analyzer.md` | `~/.claude/.ccg/prompts//analyzer.md` |
+| 规划 | `~/.claude/.ccg/prompts//architect.md` | `~/.claude/.ccg/prompts//architect.md` |
+| 实施 | `~/.claude/.ccg/prompts//architect.md` | `~/.claude/.ccg/prompts//architect.md` |
+| 审查 | `~/.claude/.ccg/prompts//reviewer.md` | `~/.claude/.ccg/prompts//reviewer.md` |
 
 **会话复用**：每次调用返回 `SESSION_ID: xxx`，后续阶段用 `resume xxx` 复用上下文。
 - **📌 必须保存 SESSION_ID**：分析阶段保存 `CODEX_SESSION` + `CODEX_B_SESSION`。

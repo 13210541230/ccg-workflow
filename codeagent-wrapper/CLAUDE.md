@@ -82,6 +82,7 @@ codeagent-wrapper --lite --backend codex "task"
 | `CODEAGENT_POST_MESSAGE_DELAY` | 消息后延迟（秒） | 5s |
 | `CODEAGENT_MAX_PARALLEL_WORKERS` | 最大并行 worker 数 | 无限制 |
 | `GEMINI_MODEL` | 默认 Gemini 模型名 | (空) |
+| `CCG_BACKEND` | 后端模型选择（codex/claude），运行时切换 | codex |
 
 ### 退出码
 
