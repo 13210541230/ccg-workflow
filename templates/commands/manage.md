@@ -112,70 +112,76 @@ Glob({ pattern: ".claude/plan/*/progress.md" })
 
 ---
 
-### Phase 1：分析
+### Phase 1-5：子Agent 派发（统一流程）
 
-**读取模板 → 替换占位符 → spawn 子Agent**：
+> **硬约束**：每个子Agent的 prompt **必须**来自模板文件。禁止自己编写 prompt 或用 Agent 工具直接派发。违反此规则会导致子Agent缺少 Codex 调用规范和自适应策略。
 
+每个阶段严格按以下 3 步执行，**不得跳过或替代任何步骤**：
+
+**第 1 步：Read 模板文件**（必须实际调用 Read 工具）
 ```
-Read({ file_path: "<PLUGIN_ROOT>/shared/agent-prompts/analyze-worker.md" })
+Read({ file_path: "<PLUGIN_ROOT>/shared/agent-prompts/<worker-name>.md" })
 ```
 
-替换占位符后 spawn：
-- `{{TASK_CONTENT}}` → 增强后的需求
-- `{{PROJECT_CONTEXT}}` → 项目上下文
-- `{{PLAN_DIR}}` → 状态目录路径
-- `$CLAUDE_PLUGIN_ROOT` / `~/.claude/.ccg` → PLUGIN_ROOT 绝对路径
+**第 2 步：文本替换占位符**（在 Read 返回的模板内容上操作）
+- `{{TASK_CONTENT}}` → 增强后的需求描述
+- `{{PROJECT_CONTEXT}}` → 项目上下文（来自 fast-context 或 Glob/Grep）
+- `{{PLAN_DIR}}` → `.claude/plan/<task-name>` 的绝对路径
+- `{{DECISIONS_CONTENT}}` → decisions.md 内容（简单任务为空）
+- `{{ANALYZE_FINDINGS}}` → 分析阶段结论（Phase 2+）
+- `{{PLAN_CONTENT}}` → 实施计划内容（Phase 3+）
+- `{{DIFF_CONTENT}}` → `git diff` 输出（Phase 4）
+- `{{CHANGED_FILES}}` → 变更文件列表（Phase 5）
+- `{{CODEX_SESSION}}` / `{{CODEX_B_SESSION}}` → Codex 会话 ID（Phase 2+，用于 resume）
+- `$CLAUDE_PLUGIN_ROOT` → PLUGIN_ROOT 绝对路径
+- `~/.claude/.ccg` → PLUGIN_ROOT 绝对路径
+- `~/.claude/bin/codeagent-wrapper` → `<PLUGIN_ROOT>/bin/run-wrapper`
 
+**第 3 步：用替换后的完整模板内容作为 prompt spawn 子Agent**
 ```
-Task({
+Agent({
   subagent_type: "general-purpose",
-  prompt: "<替换后的模板>",
-  description: "技术分析",
+  prompt: "<第 2 步替换后的完整模板内容，不得删减>",
+  description: "<阶段描述>",
   run_in_background: true
 })
 ```
 
-等待：`TaskOutput({ task_id: "...", block: true, timeout: 600000 })`
-
-结果处理 → 执行「阶段完成后处理协议」→ 自动进入 Phase 2。
+**自检**：spawn 前确认 prompt 包含「调用规范」或「自适应策略」章节。若不包含，说明模板读取或替换出错，必须重新执行第 1 步。
 
 ---
 
-### Phase 2：规划
+#### Phase 1：分析
 
-同上模式，读取 `plan-worker.md` 模板，注入分析结论 + SESSION_ID。
+模板：`<PLUGIN_ROOT>/shared/agent-prompts/analyze-worker.md`
 
-```
-Read({ file_path: "<PLUGIN_ROOT>/shared/agent-prompts/plan-worker.md" })
-```
+按上述 3 步 spawn → 等待完成 → 执行「阶段完成后处理协议」→ 自动进入 Phase 2。
+
+#### Phase 2：规划
+
+模板：`<PLUGIN_ROOT>/shared/agent-prompts/plan-worker.md`
+
+额外注入：`{{ANALYZE_FINDINGS}}` = Phase 1 的分析结论，`{{CODEX_SESSION}}` / `{{CODEX_B_SESSION}}` = Phase 1 返回的会话 ID。
 
 spawn → 等待 → 更新 `task_plan.md` → 执行后处理协议。
 
 **Hard Stop** — 展示计划，等用户确认 Y 后自动进入 Phase 3。
 
----
+#### Phase 3：实施
 
-### Phase 3：实施
+模板：`<PLUGIN_ROOT>/shared/agent-prompts/execute-worker.md`
 
 > **硬约束**：主Agent禁止直接 Edit/Write 项目源代码。
 
-读取 `execute-worker.md` 模板，注入计划内容。大型任务可拆为多个并行 worker（文件范围不重叠）。
-
-```
-Read({ file_path: "<PLUGIN_ROOT>/shared/agent-prompts/execute-worker.md" })
-```
+额外注入：`{{PLAN_CONTENT}}` = 确认后的实施计划。大型任务可拆为多个并行 worker（文件范围不重叠），每个 worker 都必须用模板。
 
 spawn → 等待 → 执行后处理协议 → 自动进入 Phase 4。
 
----
+#### Phase 4：审查
 
-### Phase 4：审查
+模板：`<PLUGIN_ROOT>/shared/agent-prompts/review-worker.md`
 
-读取 `review-worker.md` 模板，注入变更 diff。
-
-```
-Read({ file_path: "<PLUGIN_ROOT>/shared/agent-prompts/review-worker.md" })
-```
+额外注入：`{{DIFF_CONTENT}}` = `git diff` 输出。
 
 spawn → 等待 → 按 Critical/Major/Minor/Suggestion 分级。
 
@@ -183,15 +189,11 @@ spawn → 等待 → 按 Critical/Major/Minor/Suggestion 分级。
 
 无 Critical → 自动进入 Phase 5。
 
----
+#### Phase 5：测试（可选）
 
-### Phase 5：测试（可选）
+模板：`<PLUGIN_ROOT>/shared/agent-prompts/test-worker.md`
 
-读取 `test-worker.md` 模板，注入变更文件列表。
-
-```
-Read({ file_path: "<PLUGIN_ROOT>/shared/agent-prompts/test-worker.md" })
-```
+额外注入：`{{CHANGED_FILES}}` = 变更文件列表。
 
 spawn → 等待 → 执行后处理协议。
 
