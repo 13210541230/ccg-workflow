@@ -12,9 +12,10 @@
  *   4. templates/output-styles/ → dist/plugin/output-styles/ (直接复制)
  *   5. bin/codeagent-wrapper-* → dist/plugin/bin/ (全平台二进制)
  *   6. templates/bin/run-wrapper → dist/plugin/bin/run-wrapper
- *   7. templates/plugin/plugin.json → dist/plugin/.claude-plugin/plugin.json (注入版本号)
- *   8. templates/plugin/.mcp.json → dist/plugin/.mcp.json
- *   9. templates/plugin/hooks/ → dist/plugin/hooks/
+ *   7. templates/shared/ → dist/plugin/shared/ (变量替换 + 路径替换)
+ *   8. templates/plugin/plugin.json → dist/plugin/.claude-plugin/plugin.json (注入版本号)
+ *   9. templates/plugin/.mcp.json → dist/plugin/.mcp.json
+ *  10. templates/plugin/hooks/ → dist/plugin/hooks/
  */
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
@@ -59,6 +60,9 @@ const PATH_RULES = [
   // prompts 目录
   { pattern: /~\/\.claude\/\.ccg\/prompts\//g, replacement: '$CLAUDE_PLUGIN_ROOT/prompts/' },
   { pattern: /~\/\.claude\/\.ccg\/prompts\b/g, replacement: '$CLAUDE_PLUGIN_ROOT/prompts' },
+  // shared 目录
+  { pattern: /~\/\.claude\/\.ccg\/shared\//g, replacement: '$CLAUDE_PLUGIN_ROOT/shared/' },
+  { pattern: /~\/\.claude\/\.ccg\/shared\b/g, replacement: '$CLAUDE_PLUGIN_ROOT/shared' },
   // agents 目录
   { pattern: /~\/\.claude\/agents\/ccg\//g, replacement: '$CLAUDE_PLUGIN_ROOT/agents/' },
   // bin 目录
@@ -79,6 +83,7 @@ const FORBIDDEN_TOKENS = [
   '{{ROUTING_MODE}}',
   '~/.claude/bin/codeagent-wrapper',
   '~/.claude/.ccg/prompts',
+  '~/.claude/.ccg/shared',
   'codeagent-persist.sh',
 ]
 
@@ -104,7 +109,7 @@ async function main() {
   await fs.rm(outDir, { recursive: true, force: true })
 
   // 2. 创建目录结构
-  for (const dir of ['.claude-plugin', 'commands', 'agents', 'prompts', 'output-styles', 'bin', 'hooks', 'scripts']) {
+  for (const dir of ['.claude-plugin', 'commands', 'agents', 'prompts', 'output-styles', 'bin', 'hooks', 'scripts', 'shared']) {
     await fs.mkdir(path.join(outDir, dir), { recursive: true })
   }
 
@@ -129,10 +134,20 @@ async function main() {
   // 9. 写入 plugin 配置
   await writePluginConfigs(outDir)
 
-  // 10. 复制 hooks
+  // 10. 复制 shared（多模型调用规范、共享工作流、子Agent prompts）
+  const sharedDir = path.join(TEMPLATES_DIR, 'shared')
+  try {
+    await copyDirWithTransform(sharedDir, path.join(outDir, 'shared'))
+    log(`  shared: templates/shared/ → shared/`)
+  }
+  catch {
+    log(`  shared: 目录不存在，跳过`)
+  }
+
+  // 11. 复制 hooks
   await copyDir(path.join(PLUGIN_TEMPLATE_DIR, 'hooks'), path.join(outDir, 'hooks'))
 
-  // 11. 复制 scripts（MCP 启动器等）
+  // 12. 复制 scripts（MCP 启动器等）
   const scriptsDir = path.join(PLUGIN_TEMPLATE_DIR, 'scripts')
   try {
     await copyDir(scriptsDir, path.join(outDir, 'scripts'))
@@ -142,7 +157,7 @@ async function main() {
     log(`  scripts: 目录不存在，跳过`)
   }
 
-  // 12. 验证输出
+  // 13. 验证输出
   const warnings = await validateOutput(outDir)
 
   console.log(`[build-plugin] 完成: ${cmdCount} commands, ${agentCount} agents`)
@@ -312,6 +327,28 @@ function applyRules(content) {
 
 async function copyDir(src, dst) {
   await fs.cp(src, dst, { recursive: true })
+}
+
+/**
+ * 递归复制目录，对 .md 文件应用变量替换和路径替换
+ */
+async function copyDirWithTransform(src, dst) {
+  await fs.mkdir(dst, { recursive: true })
+  const entries = await fs.readdir(src, { withFileTypes: true })
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name)
+    const dstPath = path.join(dst, entry.name)
+    if (entry.isDirectory()) {
+      await copyDirWithTransform(srcPath, dstPath)
+    }
+    else if (entry.name.endsWith('.md')) {
+      const content = await fs.readFile(srcPath, 'utf-8')
+      await fs.writeFile(dstPath, applyRules(content), 'utf-8')
+    }
+    else {
+      await fs.copyFile(srcPath, dstPath)
+    }
+  }
 }
 
 async function listFiles(dir) {
