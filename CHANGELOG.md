@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.69] - 2026-03-08
+
+### ♻️ 优化
+
+- **模板去重合并**：提取共享片段到 `templates/shared/` 目录，运行时按需加载
+  - `multi-model-spec.md`：多模型调用规范（11 个命令模板共享，各减少 ~45 行）
+  - `dev-domain-workflow.md`：前后端共享 6 阶段工作流（frontend/backend 各从 164→53 行）
+  - `agent-prompts/*.md`：manage.md 的 5 个子Agent prompt 外置（manage.md 从 1357→828 行）
+- **安装器支持 shared/ 目录**：installer.ts 新增递归安装 shared/ 文件到 `~/.claude/.ccg/shared/`
+- 总计减少 ~1,100 行重复内容，降低 token 占用
+
+---
+
 ## [1.7.68] - 2026-03-08
 
 ### ✨ 新功能

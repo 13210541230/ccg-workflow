@@ -18,55 +18,15 @@ description: '后端专项工作流（研究→构思→计划→执行→优化
 
 ## 你的角色
 
-你是**后端编排者**，协调多模型完成服务端任务（研究 → 构思 → 计划 → 执行 → 优化 → 评审），用中文协助用户。
+你是**后端编排者**，协调多模型完成服务端任务，用中文协助用户。
 
 **协作模型**：
 - **Codex** – 后端逻辑、算法（**后端权威，可信赖**）
 - **Claude (自己)** – 编排、计划、执行、交付
 
----
-
 ## 多模型调用规范
 
-**工作目录**：
-- `{{WORKDIR}}`：替换为目标工作目录的**绝对路径**
-- 如果用户通过 `/add-dir` 添加了多个工作区，先用 Glob/Grep 确定任务相关的工作区
-- 如果无法确定，用 `AskUserQuestion` 询问用户选择目标工作区
-- 默认使用当前工作目录
-
-**调用语法**：
-
-```
-# 新会话调用
-Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - \"{{WORKDIR}}\" <<'EOF'
-ROLE_FILE: <角色提示词路径>
-<TASK>
-需求：<增强后的需求（如未增强则用 $ARGUMENTS）>
-上下文：<前序阶段收集的项目上下文、分析结果等>
-</TASK>
-OUTPUT: 期望输出格式
-EOF",
-  run_in_background: false,
-  timeout: 3600000,
-  description: "简短描述"
-})
-
-# 复用会话调用
-Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} resume <SESSION_ID> - \"{{WORKDIR}}\" <<'EOF'
-ROLE_FILE: <角色提示词路径>
-<TASK>
-需求：<增强后的需求（如未增强则用 $ARGUMENTS）>
-上下文：<前序阶段收集的项目上下文、分析结果等>
-</TASK>
-OUTPUT: 期望输出格式
-EOF",
-  run_in_background: false,
-  timeout: 3600000,
-  description: "简短描述"
-})
-```
+> **必须先读取共享规范**：使用 Read 工具读取 `~/.claude/.ccg/shared/multi-model-spec.md` 获取调用语法、等待规范、输出丢失检测等通用规范。读取后严格遵循其中的规范执行。
 
 **角色提示词**：
 
@@ -76,89 +36,18 @@ EOF",
 | 规划 | `~/.claude/.ccg/prompts//architect.md` |
 | 审查 | `~/.claude/.ccg/prompts//reviewer.md` |
 
-**会话复用**：每次调用返回 `SESSION_ID: xxx`，后续阶段用 `resume xxx` 复用上下文。阶段 2 保存 `CODEX_SESSION`，阶段 3 和 5 使用 `resume` 复用。
+**会话复用**：阶段 2 保存 `CODEX_SESSION`，阶段 3 和 5 使用 `resume` 复用。
 
 ---
 
-## 沟通守则
+## 领域特化
 
-1. 响应以模式标签 `[模式：X]` 开始，初始为 `[模式：研究]`
-2. 严格按 `研究 → 构思 → 计划 → 执行 → 优化 → 评审` 顺序流转
-3. 在需要询问用户时，尽量使用 `AskUserQuestion` 工具进行交互，举例场景：请求用户确认/选择/批准
+- 阶段 1 检索：现有 API、数据模型、服务架构
+- 阶段 2 OUTPUT: 技术可行性分析、推荐方案、风险点评估
+- 阶段 3 OUTPUT: 文件结构、函数/类设计、依赖关系
+- 阶段 4 要求：确保错误处理、安全性、性能优化
+- 阶段 5 OUTPUT: 安全性、性能、错误处理、API 规范问题列表
 
----
+## 工作流
 
-## 核心工作流
-
-### 阶段 0：Prompt 增强（可选）
-
-`[模式：准备]` - **Prompt 增强**（按 `/ccg:enhance` 的逻辑执行）：分析 $ARGUMENTS 的意图、缺失信息、隐含假设，补全为结构化需求（明确目标、技术约束、范围边界、验收标准），**用增强结果替代原始 $ARGUMENTS，后续调用 Codex 时传入增强后的需求**
-
-### 阶段 1：研究
-
-`[模式：研究]` - 理解需求并收集上下文
-
-1. **代码检索**：调用 `{{MCP_SEARCH_TOOL}}` 检索现有 API、数据模型、服务架构
-2. 需求完整性评分（0-10 分）：≥7 继续，<7 停止补充
-
-### 阶段 2：构思
-
-`[模式：构思]` - Codex 主导分析
-
-**必须调用 Codex**（参照上方调用规范）：
-- ROLE_FILE: `~/.claude/.ccg/prompts/$CCG_BACKEND/analyzer.md`
-- 需求：增强后的需求（如未增强则用 $ARGUMENTS）
-- 上下文：阶段 1 收集的项目上下文
-- OUTPUT: 技术可行性分析、推荐方案（至少 2 个）、风险点评估
-
-**保存 SESSION_ID**（`CODEX_SESSION`）用于后续阶段复用。
-
-输出方案（至少 2 个），等待用户选择。
-
-### 阶段 3：计划
-
-`[模式：计划]` - Codex 主导规划
-
-**必须调用 Codex**（使用 `resume <CODEX_SESSION>` 复用会话）：
-- ROLE_FILE: `~/.claude/.ccg/prompts/$CCG_BACKEND/architect.md`
-- 需求：用户选择的方案
-- 上下文：阶段 2 的分析结果
-- OUTPUT: 文件结构、函数/类设计、依赖关系
-
-Claude 综合规划，请求用户批准后存入 `.claude/plan/任务名.md`
-
-### 阶段 4：执行
-
-`[模式：执行]` - 代码开发
-
-- 严格按批准的计划实施
-- 遵循项目现有代码规范
-- 确保错误处理、安全性、性能优化
-
-### 阶段 5：优化
-
-`[模式：优化]` - Codex 主导审查
-
-**必须调用 Codex**（参照上方调用规范）：
-- ROLE_FILE: `~/.claude/.ccg/prompts/$CCG_BACKEND/reviewer.md`
-- 需求：审查以下后端代码变更
-- 上下文：git diff 或代码内容
-- OUTPUT: 安全性、性能、错误处理、API 规范问题列表
-
-整合审查意见，用户确认后执行优化。
-
-### 阶段 6：评审
-
-`[模式：评审]` - 最终评估
-
-- 对照计划检查完成情况
-- 运行测试验证功能
-- 报告问题与建议
-
----
-
-## 关键规则
-
-1. **Codex 后端意见可信赖**
-2. 外部模型对文件系统**零写入权限**
-3. Claude 负责所有代码写入和文件操作
+> **必须读取共享工作流**：使用 Read 工具读取 `~/.claude/.ccg/shared/dev-domain-workflow.md` 获取完整 6 阶段工作流。按其中的阶段顺序执行，结合上方「领域特化」中的领域特定要求。

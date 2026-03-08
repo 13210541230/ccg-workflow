@@ -675,6 +675,46 @@ ${workflow.description}
     }
   }
 
+  // Install shared templates (multi-model-spec, dev-domain-workflow, agent-prompts, etc.)
+  const sharedTemplateDir = join(templateDir, 'shared')
+  const sharedDestDir = join(ccgConfigDir, 'shared')
+  if (await fs.pathExists(sharedTemplateDir)) {
+    try {
+      // Recursively copy shared directory, processing each .md file
+      await fs.ensureDir(sharedDestDir)
+      const copySharedDir = async (srcDir: string, destDir: string) => {
+        await fs.ensureDir(destDir)
+        const entries = await fs.readdir(srcDir, { withFileTypes: true })
+        for (const entry of entries) {
+          const srcPath = join(srcDir, entry.name)
+          const destPath = join(destDir, entry.name)
+          if (entry.isDirectory()) {
+            await copySharedDir(srcPath, destPath)
+          }
+          else if (entry.name.endsWith('.md')) {
+            if (force || !(await fs.pathExists(destPath))) {
+              let templateContent = await fs.readFile(srcPath, 'utf-8')
+              templateContent = injectConfigVariables(templateContent, installConfig)
+              const processedContent = replaceHomePathsInTemplate(templateContent, installDir)
+              await fs.writeFile(destPath, processedContent, 'utf-8')
+            }
+          }
+          else {
+            // Copy non-md files as-is
+            if (force || !(await fs.pathExists(destPath))) {
+              await fs.copy(srcPath, destPath)
+            }
+          }
+        }
+      }
+      await copySharedDir(sharedTemplateDir, sharedDestDir)
+    }
+    catch (error) {
+      result.errors.push(`Failed to install shared templates: ${error}`)
+      result.success = false
+    }
+  }
+
   // Install prompts (codex, gemini, claude role definitions)
   const promptsTemplateDir = join(templateDir, 'prompts')
   if (await fs.pathExists(promptsTemplateDir)) {

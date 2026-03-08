@@ -1,12 +1,20 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-08 (v1.7.68)
+**Last Updated**: 2026-03-08 (v1.7.69)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-08 (v1.7.69 - 模板去重合并)
+- 新增 `templates/shared/` 共享片段目录（multi-model-spec / dev-domain-workflow / agent-prompts）
+- 11 个命令模板提取多模型调用规范为运行时引用，各减少 ~45 行
+- frontend.md / backend.md 共享 6 阶段工作流，各从 164→53 行
+- manage.md 的 5 个子Agent prompt 外置，从 1357→828 行
+- installer.ts 新增 shared/ 递归安装逻辑
+- 总计减少 ~1,100 行重复内容
 
 ### 2026-03-08 (v1.7.68 - upstream 合并 + 适配)
 - 合并 upstream 5 个提交：MCP skip 修复、OpenSpec 1.2 适配、spec-research 并行调用补全
