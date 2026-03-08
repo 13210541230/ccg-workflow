@@ -1,12 +1,16 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-08 (v1.7.70)
+**Last Updated**: 2026-03-08 (v1.7.71)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-08 (v1.7.71 - manage 轻量化重构)
+- manage.md 从 853→269 行，转为纯编排器（删除多模型调用规范、外置状态文件格式）
+- 5 个 worker 模板新增自适应 Codex 策略：简单任务 Claude 直接处理，复杂任务 Codex 双模型
 
 ### 2026-03-08 (v1.7.70 - manage 子Agent 路径修复)
 - 修复 `$CLAUDE_PLUGIN_ROOT` 在 Task spawn 子Agent 中不继承，导致 Codex 双模型调用失败

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.71] - 2026-03-08
+
+### ♻️ 优化
+
+- **manage.md 轻量化重构**：从 853 行精简至 269 行（减少 68%），转为纯编排器
+  - 删除"多模型调用规范"章节（子Agent不读取，~75 行）
+  - 状态文件格式外置到 `shared/manage-state-format.md`（~140 行）
+  - Phase 1-5 spawn 指令改为"读取模板 → 替换占位符 → spawn"的 3 行模式
+  - 精简讨论阶段和后处理协议描述
+- **子Agent 自适应 Codex 策略**：5 个 worker 模板新增复杂度评估，按需决定是否调用 Codex
+  - 简单任务（≤2 文件、无架构变更）→ Claude 直接分析/执行
+  - 复杂任务（>2 文件、架构变更、跨模块依赖）→ Codex 双模型交叉验证
+
+---
+
 ## [1.7.70] - 2026-03-08
 
 ### 🐛 修复
