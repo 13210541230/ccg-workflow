@@ -147,11 +147,11 @@ async function main() {
   // 11. 复制 hooks
   await copyDir(path.join(PLUGIN_TEMPLATE_DIR, 'hooks'), path.join(outDir, 'hooks'))
 
-  // 12. 复制 scripts（MCP 启动器等）
+  // 12. 复制 scripts（manage 钩子等）
   const scriptsDir = path.join(PLUGIN_TEMPLATE_DIR, 'scripts')
   try {
     await copyDir(scriptsDir, path.join(outDir, 'scripts'))
-    log(`  scripts: start-mcp.mjs`)
+    log(`  scripts: manage hooks`)
   }
   catch {
     log(`  scripts: 目录不存在，跳过`)
