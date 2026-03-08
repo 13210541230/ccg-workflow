@@ -338,7 +338,26 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 `[模式：初始化]`
 
-#### 0.0 会话恢复检测（必须最先执行）
+#### 0.0 解析 Plugin Root 路径（最先执行）
+
+子Agent 不继承 `$CLAUDE_PLUGIN_ROOT` 环境变量，因此必须在主Agent中解析绝对路径，后续 spawn 子Agent 时用绝对路径注入模板。
+
+**执行以下 Bash 命令获取 PLUGIN_ROOT**：
+
+```
+Bash({
+  command: "if [ -n \"${CLAUDE_PLUGIN_ROOT:-}\" ]; then echo \"$CLAUDE_PLUGIN_ROOT\"; elif [ -d \"$HOME/.claude/plugins/cache/ccg-plugin/ccg\" ]; then ls -d \"$HOME/.claude/plugins/cache/ccg-plugin/ccg\"/*/commands/manage.md 2>/dev/null | sort -V | tail -1 | sed 's|/commands/manage.md$||'; elif [ -d \"$HOME/.claude/plugins/marketplaces/ccg-plugin\" ]; then echo \"$HOME/.claude/plugins/marketplaces/ccg-plugin\"; elif [ -d \"$HOME/.claude/.ccg\" ]; then echo \"$HOME/.claude/.ccg\"; else echo 'PLUGIN_ROOT_NOT_FOUND'; fi",
+  description: "解析 CCG plugin root 绝对路径"
+})
+```
+
+**保存结果**：将输出保存为 `PLUGIN_ROOT` 变量（如 `/c/Users/20557/.claude/plugins/cache/ccg-plugin/ccg/1.7.69`）。若输出为 `PLUGIN_ROOT_NOT_FOUND`，立即通知用户 CCG 插件未安装，终止执行。
+
+**后续使用**：所有子Agent模板中的 `$CLAUDE_PLUGIN_ROOT` 和 `~/.claude/.ccg` 在注入 prompt 前，必须替换为此绝对路径。读取模板文件时也使用此路径。
+
+---
+
+#### 0.1 会话恢复检测
 
 检查是否存在未完成的 manage 会话：
 
@@ -350,15 +369,15 @@ Glob({ pattern: ".claude/plan/*/progress.md" })
 1. 读取该会话的所有状态文件（`progress.md`、`task_plan.md`、`findings.md`、`decisions.md`）
 2. 向用户展示当前进度：`"检测到未完成的 manage 会话：<task-name>，当前状态：<status>。是否继续？"`
 3. 用户确认继续 → 从中断的阶段恢复执行（根据 progress.md 的状态字段决定恢复点）
-4. 用户选择新建 → 正常进入 Phase 0.1
+4. 用户选择新建 → 正常进入 Phase 0.2
 
-若无未完成会话 → 正常进入 Phase 0.1
+若无未完成会话 → 正常进入 Phase 0.2
 
-#### 0.1 Prompt 增强（必须首先执行）
+#### 0.2 Prompt 增强（必须首先执行）
 
 **Prompt 增强**（按 `/ccg:enhance` 的逻辑执行）：分析 $ARGUMENTS 的意图、缺失信息、隐含假设，补全为结构化需求（明确目标、技术约束、范围边界、验收标准），**用增强结果替代原始 $ARGUMENTS** 用于后续所有阶段。
 
-#### 0.2 Sequential-Thinking 任务分解
+#### 0.3 Sequential-Thinking 任务分解
 
 调用 `mcp__sequential-thinking__sequentialthinking` 进行结构化思考：
 
@@ -399,7 +418,7 @@ mcp__sequential-thinking__sequentialthinking({
 })
 ```
 
-#### 0.3 创建状态文件
+#### 0.4 创建状态文件
 
 1. 创建目录：`.claude/plan/<task-name>/`
 2. 写入 `task_plan.md`（sequential-thinking 的任务拆解结果）
@@ -407,7 +426,7 @@ mcp__sequential-thinking__sequentialthinking({
 4. 写入 `findings.md`（空模板）
 5. 写入 `decisions.md`（空模板，待讨论阶段填充）
 
-#### 0.4 复杂度评估（决定是否进入讨论阶段）
+#### 0.5 复杂度评估（决定是否进入讨论阶段）
 
 基于 sequential-thinking 的输出，评估以下指标：
 
@@ -801,24 +820,30 @@ Task({
 - `{{SESSION_ID}}`：Codex 会话 ID（用于 resume）
 - `{{DECISIONS_CONTENT}}`：已确认决策集（从 decisions.md 读取）
 - `{{PLAN_DIR}}`：当前任务的状态目录绝对路径
+- `$CLAUDE_PLUGIN_ROOT`：Phase 0.0 解析的 PLUGIN_ROOT 绝对路径（**子Agent 不继承环境变量，必须文本替换**）
 
-**模板文件路径**：
+**模板文件路径**（使用 Phase 0.0 解析的 `PLUGIN_ROOT`）：
 
 | Worker | 模板路径 |
 |--------|----------|
-| analyze-worker | `~/.claude/.ccg/shared/agent-prompts/analyze-worker.md` |
-| plan-worker | `~/.claude/.ccg/shared/agent-prompts/plan-worker.md` |
-| execute-worker | `~/.claude/.ccg/shared/agent-prompts/execute-worker.md` |
-| review-worker | `~/.claude/.ccg/shared/agent-prompts/review-worker.md` |
-| test-worker | `~/.claude/.ccg/shared/agent-prompts/test-worker.md` |
+| analyze-worker | `<PLUGIN_ROOT>/shared/agent-prompts/analyze-worker.md` |
+| plan-worker | `<PLUGIN_ROOT>/shared/agent-prompts/plan-worker.md` |
+| execute-worker | `<PLUGIN_ROOT>/shared/agent-prompts/execute-worker.md` |
+| review-worker | `<PLUGIN_ROOT>/shared/agent-prompts/review-worker.md` |
+| test-worker | `<PLUGIN_ROOT>/shared/agent-prompts/test-worker.md` |
 
 **使用方式**：
 
 ```
-// 读取模板
-Read({ file_path: "~/.claude/.ccg/shared/agent-prompts/<worker-name>.md" })
+// 1. 读取模板（使用 PLUGIN_ROOT 绝对路径）
+Read({ file_path: "<PLUGIN_ROOT>/shared/agent-prompts/<worker-name>.md" })
 
-// 替换占位符后作为子Agent的 prompt
+// 2. 替换模板中的所有占位符，包括：
+//    - {{TASK_CONTENT}}, {{PROJECT_CONTEXT}} 等业务占位符
+//    - $CLAUDE_PLUGIN_ROOT → PLUGIN_ROOT 绝对路径（关键！子Agent 无法访问此环境变量）
+//    - ~/.claude/.ccg → PLUGIN_ROOT 绝对路径（npm 安装模式兼容）
+
+// 3. spawn 子Agent
 Task({
   subagent_type: "general-purpose",
   prompt: "<替换后的模板内容>",

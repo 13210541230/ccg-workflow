@@ -1,12 +1,17 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-08 (v1.7.69)
+**Last Updated**: 2026-03-08 (v1.7.70)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-08 (v1.7.70 - manage 子Agent 路径修复)
+- 修复 `$CLAUDE_PLUGIN_ROOT` 在 Task spawn 子Agent 中不继承，导致 Codex 双模型调用失败
+- manage.md Phase 0 新增路径解析步骤（0.0），启动时解析 plugin root 绝对路径
+- 子Agent 模板注入时用绝对路径替换环境变量占位符
 
 ### 2026-03-08 (v1.7.69 - 模板去重合并)
 - 新增 `templates/shared/` 共享片段目录（multi-model-spec / dev-domain-workflow / agent-prompts）

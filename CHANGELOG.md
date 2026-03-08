@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.70] - 2026-03-08
+
+### 🐛 修复
+
+- **manage 子Agent Codex 调用失败**：修复 `$CLAUDE_PLUGIN_ROOT` 环境变量在 Task spawn 的子Agent 中不继承，导致 codeagent-wrapper 路径解析失败、子Agent 跳过 Codex 双模型分析的问题
+  - Phase 0 新增路径解析步骤（0.0），主Agent 启动时解析 plugin root 绝对路径
+  - 子Agent 模板注入时用绝对路径替换 `$CLAUDE_PLUGIN_ROOT` 占位符
+  - 兼容插件缓存、marketplaces、npm 安装三种路径
+
+---
+
 ## [1.7.69] - 2026-03-08
 
 ### ♻️ 优化
