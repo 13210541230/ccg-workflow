@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.68] - 2026-03-08
+
+### ✨ 新功能
+
+- **OpenSpec 1.2 适配**：spec-* 系列模板支持 Profile 系统（core/custom）、AI 工具自动检测
+- **MCP skip 修复**：选择跳过 MCP 时，模板正确降级为 Glob+Grep 而非注入不存在的工具引用
+
+### 🐛 修复
+
+- spec-research Step 4 补全双 Codex 并行调用模板（替代串行执行）
+- 移除 spec-* 模板中的 /opsx 直接引用，保持 CCG 封装纯粹性
+
+### 🧪 测试
+
+- 新增 vitest 测试框架（34 单元测试 + 12 E2E 测试，共 46 个）
+- 单元测试覆盖 skip/fast-context/ace-tool 三种 MCP provider
+- E2E 测试验证 installWorkflows 全流程模板注入
+
+---
+
 ## [1.7.61] - 2026-02-10
 
 ### 🐛 修复

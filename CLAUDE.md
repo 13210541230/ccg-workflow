@@ -1,12 +1,17 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-02-25 (v1.7.61)
+**Last Updated**: 2026-03-08 (v1.7.68)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-08 (v1.7.68 - upstream 合并 + 适配)
+- 合并 upstream 5 个提交：MCP skip 修复、OpenSpec 1.2 适配、spec-research 并行调用补全
+- 测试体系：新增 vitest（34 单元 + 12 E2E = 46 个测试），覆盖 skip/fast-context/ace-tool
+- 适配改造：所有模板 Gemini 引用替换为 Codex-B，默认 provider 改为 fast-context
 
 ### 2026-02-25 (插件集成 + manage 命令)
 - 新增 `/ccg:manage` 主Agent调度命令（自动化编排 + planning-with-files 状态管理）
