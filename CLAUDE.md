@@ -55,7 +55,7 @@
 
 ## 项目愿景
 
-**CCG (Claude + Codex + Gemini)** 是一个多模型协作开发系统，以 Claude Code 为编排中心，通过固定路由将前端任务分发给 Gemini、后端任务分发给 Codex，实现多模型协作的最佳开发体验。用户通过 `npx ccg-workflow` 一键安装 27 个斜杠命令 + 19 个专家提示词到 `~/.claude/`，即可在 Claude Code 中使用 `/ccg:xxx` 命令。
+**CCG (Claude + Codex)** 是一个多模型协作开发系统，以 Claude Code 为编排中心，通过 Codex 双视角（逻辑 + 架构）实现多模型协作的最佳开发体验。以 Claude Code Plugin 形式分发，用户通过 `/install-plugin` 一键安装 27 个斜杠命令 + 19 个专家提示词，即可使用 `/ccg:xxx` 命令。
 
 ---
 
@@ -63,21 +63,20 @@
 
 ```mermaid
 graph TD
-    User["用户"] --> CLI["npx ccg-workflow"]
-    CLI --> Init["一键安装"]
+    User["用户"] --> Plugin["/install-plugin"]
+    Plugin --> Init["一键安装"]
 
-    Init --> Commands["~/.claude/commands/ccg/<br/>27 个命令"]
-    Init --> Agents["~/.claude/agents/ccg/<br/>4 个子智能体"]
-    Init --> Prompts["~/.claude/.ccg/prompts/<br/>19 个专家提示词"]
-    Init --> Binary["~/.claude/bin/<br/>codeagent-wrapper"]
-    Init --> MCP["~/.claude.json<br/>MCP 配置（可选）"]
+    Init --> Commands["commands/<br/>27 个命令"]
+    Init --> Agents["agents/<br/>4 个子智能体"]
+    Init --> Prompts["prompts/<br/>19 个专家提示词"]
+    Init --> Binary["bin/<br/>codeagent-wrapper"]
 
     User2["Claude Code 用户"] --> SlashCmd["/ccg:workflow<br/>/ccg:frontend<br/>..."]
     SlashCmd --> Commands
 
     Commands --> Wrapper["codeagent-wrapper<br/>(Go v5.7.2)"]
     Wrapper --> Codex["Codex CLI<br/>(后端)"]
-    Wrapper --> Gemini["Gemini CLI<br/>(前端)"]
+    Wrapper --> Codex2["Codex CLI<br/>(前端)"]
     Wrapper --> Claude2["Claude CLI<br/>(编排)"]
 
     style CLI fill:#90EE90
@@ -90,7 +89,7 @@ graph TD
 
 ```mermaid
 graph TD
-    A["(根) ccg-workflow<br/>v1.7.61"] --> B["src/<br/>TypeScript CLI"]
+    A["(根) ccg-workflow<br/>v1.7.68"] --> B["src/<br/>TypeScript CLI"]
     A --> C["codeagent-wrapper/<br/>Go 多后端调用"]
     A --> D["templates/<br/>命令 + 提示词"]
     A --> E["bin/<br/>预编译产物"]
@@ -125,17 +124,16 @@ graph TD
 
 ## 运行与开发
 
-### 用户安装
+### 用户安装（插件模式）
 
-```bash
-# 一键安装（推荐）
-npx ccg-workflow
+在 Claude Code 中执行：
+```
+/install-plugin https://github.com/13210541230/ccg-plugin.git
+```
 
-# 交互式菜单
-npx ccg-workflow menu
-
-# 更新
-npx ccg-workflow update
+更新插件：
+```
+/plugin update
 ```
 
 ### 开发模式
@@ -174,35 +172,23 @@ bash build-all.sh
 
 ## 对外接口
 
-### CLI 命令接口
-
-| 命令 | 用途 |
-|------|------|
-| `npx ccg-workflow` | 一键安装/菜单 |
-| `npx ccg-workflow menu` | 交互式菜单 |
-| `npx ccg-workflow init` | 初始化 CCG 系统 |
-| `npx ccg-workflow update` | 更新到最新版本 |
-| `npx ccg-workflow diagnose-mcp` | 诊断 MCP 配置 |
-| `npx ccg-workflow fix-mcp` | 修复 Windows MCP 配置 |
-| `npx ccg-workflow config mcp` | MCP 工具配置 |
-
 ### Slash Commands 接口（27 个命令）
 
 **开发工作流（12 个）**:
 
 | 命令 | 用途 | 模型 |
 |------|------|------|
-| `/ccg:workflow` | 完整 6 阶段工作流 | Codex + Gemini |
-| `/ccg:plan` | 多模型协作规划（Phase 1-2） | Codex + Gemini |
-| `/ccg:execute` | 多模型协作执行（Phase 3-5） | Codex + Gemini + Claude |
-| `/ccg:frontend` | 前端专项（快速模式） | Gemini |
+| `/ccg:workflow` | 完整 6 阶段工作流 | Codex + Codex |
+| `/ccg:plan` | 多模型协作规划（Phase 1-2） | Codex + Codex |
+| `/ccg:execute` | 多模型协作执行（Phase 3-5） | Codex + Claude |
+| `/ccg:frontend` | 前端专项（快速模式） | Codex |
 | `/ccg:backend` | 后端专项（快速模式） | Codex |
 | `/ccg:feat` | 智能功能开发 | 规划 + 实施 |
-| `/ccg:analyze` | 技术分析（仅分析） | Codex + Gemini |
-| `/ccg:debug` | 问题诊断 + 修复 | Codex + Gemini |
-| `/ccg:optimize` | 性能优化 | Codex + Gemini |
+| `/ccg:analyze` | 技术分析（仅分析） | Codex + Codex |
+| `/ccg:debug` | 问题诊断 + 修复 | Codex + Codex |
+| `/ccg:optimize` | 性能优化 | Codex + Codex |
 | `/ccg:test` | 测试生成 | 智能路由 |
-| `/ccg:review` | 代码审查（自动 git diff） | Codex + Gemini |
+| `/ccg:review` | 代码审查（自动 git diff） | Codex + Codex |
 | `/ccg:manage` | 主Agent调度（自动化编排） | sequential-thinking + comprehensive-review |
 
 **Prompt 工具（1 个）**:
@@ -240,10 +226,10 @@ bash build-all.sh
 
 | 命令 | 用途 | 说明 |
 |------|------|------|
-| `/ccg:team-research` | 需求 -> 约束集 | 并行探索代码库，Codex + Gemini 双模型分析 |
+| `/ccg:team-research` | 需求 -> 约束集 | 并行探索代码库，双 Codex 分析 |
 | `/ccg:team-plan` | 约束 -> 并行计划 | 消除歧义，拆分为文件范围隔离的独立子任务 |
 | `/ccg:team-exec` | 并行实施 | spawn Builder teammates 并行写代码 |
-| `/ccg:team-review` | 双模型审查 | Codex + Gemini 交叉审查 |
+| `/ccg:team-review` | 双模型审查 | 双 Codex 交叉审查 |
 
 ---
 
@@ -254,7 +240,7 @@ v1.7.0 起，以下配置不再支持自定义：
 | 项目 | 固定值 | 原因 |
 |------|--------|------|
 | 语言 | 中文 | 所有模板为中文 |
-| 前端模型 | Gemini | 擅长 UI/CSS/组件 |
+| 前端模型 | Codex | 双 Codex 架构 |
 | 后端模型 | Codex（默认），可通过 CCG_BACKEND=claude 切换 | 擅长逻辑/算法/调试 |
 | 协作模式 | smart | 最佳实践 |
 | 命令数量 | 27 个 | 全部安装 |
@@ -266,7 +252,7 @@ v1.7.0 起，以下配置不再支持自定义：
 | 模块 | 测试情况 |
 |------|----------|
 | `codeagent-wrapper/` (Go) | 16 个测试文件，覆盖核心逻辑、并发、压力测试、基准测试 |
-| `src/` (TypeScript) | 暂无自动化测试；依赖 `tsc --noEmit` 类型检查 + ESLint |
+| `src/` (TypeScript) | 46 个测试（34 单元 + 12 E2E），vitest |
 | `templates/` (Markdown) | 无自动化测试；通过安装流程间接验证 |
 
 ---
@@ -380,7 +366,7 @@ bin/
 
 - 使用 `/ccg:workflow` 进行完整 6 阶段开发工作流
 - 使用 `/ccg:plan` + `/ccg:execute` 分步执行规划和实施
-- 前端任务用 `/ccg:frontend`（路由到 Gemini）
+- 前端任务用 `/ccg:frontend`（路由到 Codex）
 - 后端任务用 `/ccg:backend`（路由到 Codex）
 - Agent Teams 系列需先启用 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
 - 代码审查无参数时自动审查 `git diff`
@@ -407,11 +393,18 @@ bin/
 - 添加变更记录条目
 - 更新命令数量、接口表等受影响的章节
 
-### 5. 构建 + 发布 + 推送
+### 5. 构建 + 同步插件 + 推送
+
+使用 release 技能自动化（详见 `.claude/skills/release/`）：
 
 ```bash
-pnpm build
-npm publish
+bash .claude/skills/release/scripts/release.sh x.y.z
+```
+
+脚本自动完成：更新版本号 → 构建插件 → 运行测试 → 同步到 ccg-plugin → 推送 ccg-plugin
+
+然后手动提交 ccg-workflow：
+```bash
 git add -A
 git commit -m "chore: bump version to x.y.z"
 git push origin main
@@ -422,9 +415,10 @@ git push origin main
 - [ ] CHANGELOG.md 已添加新版本条目
 - [ ] README.md 已更新
 - [ ] CLAUDE.md 已更新
-- [ ] `pnpm build` 通过
-- [ ] `npm publish` 成功
-- [ ] `git push origin main` 成功
+- [ ] 插件构建通过（`node scripts/build-plugin.mjs`）
+- [ ] 测试通过（`npx vitest run`）
+- [ ] ccg-plugin 已推送
+- [ ] ccg-workflow 已推送
 
 ---
 
