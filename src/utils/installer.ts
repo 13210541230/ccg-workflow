@@ -396,7 +396,7 @@ export function getWorkflowPreset(preset: WorkflowPreset): string[] {
  * This injects model routing configs at install time
  * Note: MCP tool names are now hardcoded to ace-tool in templates
  */
-function injectConfigVariables(content: string, config: {
+export function injectConfigVariables(content: string, config: {
   routing?: {
     mode?: string
     frontend?: { models?: string[], primary?: string }
@@ -436,9 +436,34 @@ function injectConfigVariables(content: string, config: {
   const liteModeFlag = config.liteMode ? '--lite ' : ''
   processed = processed.replace(/\{\{LITE_MODE_FLAG\}\}/g, liteModeFlag)
 
-  // MCP tool injection based on provider ('skip' defaults to fast-context)
+  // MCP tool injection based on provider ('skip' gets Glob+Grep fallback, default is fast-context)
   const mcpProvider = config.mcpProvider || 'fast-context'
-  if (mcpProvider === 'fast-context' || mcpProvider === 'skip') {
+  if (mcpProvider === 'skip') {
+    // MCP skipped: remove all MCP tool references, replace with Glob+Grep fallback
+
+    // 1) Agent frontmatter — remove MCP tool from tools declaration
+    processed = processed.replace(/,\s*\{\{MCP_SEARCH_TOOL\}\}/g, '')
+
+    // 2) Code blocks containing MCP tool invocation — replace with fallback guidance
+    processed = processed.replace(
+      /```\n\{\{MCP_SEARCH_TOOL\}\}[\s\S]*?\n```/g,
+      '> MCP 未配置。使用 `Glob` 定位文件 + `Grep` 搜索关键符号 + `Read` 读取文件内容。',
+    )
+
+    // 3) Inline backtick references — replace with fallback tool names
+    processed = processed.replace(
+      /`\{\{MCP_SEARCH_TOOL\}\}`/g,
+      '`Glob + Grep`（MCP 未配置）',
+    )
+
+    // 4) Any remaining bare references (safety net)
+    processed = processed.replace(/\{\{MCP_SEARCH_TOOL\}\}/g, 'Glob + Grep')
+
+    // 5) MCP_SEARCH_PARAM / MCP_PATH_PARAM — not applicable when skipped
+    processed = processed.replace(/\{\{MCP_SEARCH_PARAM\}\}/g, '')
+    processed = processed.replace(/\{\{MCP_PATH_PARAM\}\}/g, '')
+  }
+  else if (mcpProvider === 'fast-context') {
     // fast-context MCP tools (default)
     processed = processed.replace(/\{\{MCP_SEARCH_TOOL\}\}/g, 'mcp__fast-context__fast_context_search')
     processed = processed.replace(/\{\{MCP_SEARCH_PARAM\}\}/g, 'query')
