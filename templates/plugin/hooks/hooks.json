@@ -19,6 +19,15 @@
             "command": "bash \"$CLAUDE_PLUGIN_ROOT/scripts/manage-pre-task.sh\" 2>/dev/null || true"
           }
         ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PLUGIN_ROOT/scripts/manage-validate-agent.sh\" 2>/dev/null || true"
+          }
+        ]
       }
     ],
     "PostToolUse": [
