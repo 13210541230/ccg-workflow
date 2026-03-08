@@ -114,54 +114,65 @@ Glob({ pattern: ".claude/plan/*/progress.md" })
 
 ### Phase 1-5：子Agent 派发（统一流程）
 
-> **硬约束**：每个子Agent的 prompt **必须**来自模板文件。禁止自己编写 prompt 或用 Agent 工具直接派发。违反此规则会导致子Agent缺少 Codex 调用规范和自适应策略。
+> **硬约束**：每个子Agent的 prompt **必须**由 `assemble-prompt.sh` 脚本从模板生成。**禁止**自己编写 prompt、跳过脚本、或用 Agent 工具直接派发自定义内容。
 
-每个阶段严格按以下 3 步执行，**不得跳过或替代任何步骤**：
+每个阶段严格按以下 2 步执行：
 
-**第 1 步：Read 模板文件**（必须实际调用 Read 工具）
+**第 1 步：调用 assemble-prompt.sh 生成完整 prompt**
+
 ```
-Read({ file_path: "<PLUGIN_ROOT>/shared/agent-prompts/<worker-name>.md" })
+Bash({
+  command: "PROMPT_TASK='<增强后的需求>' PROMPT_CONTEXT='<项目上下文>' PROMPT_DECISIONS='<decisions.md 内容>' bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh <worker-name> --plugin-root <PLUGIN_ROOT> --plan-dir <PLAN_DIR绝对路径> [--session <CODEX_SESSION>] [--session-b <CODEX_B_SESSION>]",
+  description: "组装 <worker-name> prompt"
+})
 ```
 
-**第 2 步：文本替换占位符**（在 Read 返回的模板内容上操作）
-- `{{TASK_CONTENT}}` → 增强后的需求描述
-- `{{PROJECT_CONTEXT}}` → 项目上下文（来自 fast-context 或 Glob/Grep）
-- `{{PLAN_DIR}}` → `.claude/plan/<task-name>` 的绝对路径
-- `{{DECISIONS_CONTENT}}` → decisions.md 内容（简单任务为空）
-- `{{ANALYZE_FINDINGS}}` → 分析阶段结论（Phase 2+）
-- `{{PLAN_CONTENT}}` → 实施计划内容（Phase 3+）
-- `{{DIFF_CONTENT}}` → `git diff` 输出（Phase 4）
-- `{{CHANGED_FILES}}` → 变更文件列表（Phase 5）
-- `{{CODEX_SESSION}}` / `{{CODEX_B_SESSION}}` → Codex 会话 ID（Phase 2+，用于 resume）
-- `$CLAUDE_PLUGIN_ROOT` → PLUGIN_ROOT 绝对路径
-- `~/.claude/.ccg` → PLUGIN_ROOT 绝对路径
-- `~/.claude/bin/codeagent-wrapper` → `<PLUGIN_ROOT>/bin/run-wrapper`
+环境变量（按阶段按需提供）：
 
-**第 3 步：用替换后的完整模板内容作为 prompt spawn 子Agent**
+| 变量 | 说明 | 使用阶段 |
+|------|------|----------|
+| `PROMPT_TASK` | 增强后的需求描述 | 全部 |
+| `PROMPT_CONTEXT` | 项目上下文 | Phase 1, 2, 3, 5 |
+| `PROMPT_DECISIONS` | decisions.md 内容 | Phase 1, 2, 3 |
+| `PROMPT_FINDINGS` | 分析阶段结论 | Phase 2, 3 |
+| `PROMPT_PLAN` | 实施计划内容 | Phase 3 |
+| `PROMPT_DIFF` | `git diff` 输出 | Phase 4 |
+| `PROMPT_CHANGED_FILES` | 变更文件列表 | Phase 5 |
+
+**第 2 步：用脚本输出作为 prompt 原封不动地 spawn 子Agent**
+
 ```
 Agent({
   subagent_type: "general-purpose",
-  prompt: "<第 2 步替换后的完整模板内容，不得删减>",
+  prompt: "<第 1 步 Bash 输出的完整文本，不得修改或删减>",
   description: "<阶段描述>",
   run_in_background: true
 })
 ```
 
-**自检**：spawn 前确认 prompt 包含「调用规范」或「自适应策略」章节。若不包含，说明模板读取或替换出错，必须重新执行第 1 步。
+**自检**：若 Bash 输出包含 `[assemble-prompt] 错误` 或为空，说明脚本执行失败，排查后重试。
 
 ---
 
 #### Phase 1：分析
 
-模板：`<PLUGIN_ROOT>/shared/agent-prompts/analyze-worker.md`
+```
+Bash({
+  command: "PROMPT_TASK='<需求>' PROMPT_CONTEXT='<上下文>' PROMPT_DECISIONS='<决策>' bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh analyze-worker --plugin-root <PLUGIN_ROOT> --plan-dir <PLAN_DIR>",
+  description: "组装 analyze-worker prompt"
+})
+```
 
-按上述 3 步 spawn → 等待完成 → 执行「阶段完成后处理协议」→ 自动进入 Phase 2。
+spawn → 等待完成 → 执行「阶段完成后处理协议」→ 自动进入 Phase 2。
 
 #### Phase 2：规划
 
-模板：`<PLUGIN_ROOT>/shared/agent-prompts/plan-worker.md`
-
-额外注入：`{{ANALYZE_FINDINGS}}` = Phase 1 的分析结论，`{{CODEX_SESSION}}` / `{{CODEX_B_SESSION}}` = Phase 1 返回的会话 ID。
+```
+Bash({
+  command: "PROMPT_TASK='<需求>' PROMPT_CONTEXT='<上下文>' PROMPT_DECISIONS='<决策>' PROMPT_FINDINGS='<Phase 1 分析结论>' bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh plan-worker --plugin-root <PLUGIN_ROOT> --plan-dir <PLAN_DIR> --session <CODEX_SESSION> --session-b <CODEX_B_SESSION>",
+  description: "组装 plan-worker prompt"
+})
+```
 
 spawn → 等待 → 更新 `task_plan.md` → 执行后处理协议。
 
@@ -169,19 +180,27 @@ spawn → 等待 → 更新 `task_plan.md` → 执行后处理协议。
 
 #### Phase 3：实施
 
-模板：`<PLUGIN_ROOT>/shared/agent-prompts/execute-worker.md`
-
 > **硬约束**：主Agent禁止直接 Edit/Write 项目源代码。
 
-额外注入：`{{PLAN_CONTENT}}` = 确认后的实施计划。大型任务可拆为多个并行 worker（文件范围不重叠），每个 worker 都必须用模板。
+```
+Bash({
+  command: "PROMPT_TASK='<需求>' PROMPT_CONTEXT='<上下文>' PROMPT_DECISIONS='<决策>' PROMPT_FINDINGS='<分析结论>' PROMPT_PLAN='<确认后的计划>' bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh execute-worker --plugin-root <PLUGIN_ROOT> --plan-dir <PLAN_DIR> --session <CODEX_SESSION>",
+  description: "组装 execute-worker prompt"
+})
+```
+
+大型任务可拆为多个并行 worker（文件范围不重叠），每个 worker 都必须通过 assemble-prompt.sh 生成 prompt。
 
 spawn → 等待 → 执行后处理协议 → 自动进入 Phase 4。
 
 #### Phase 4：审查
 
-模板：`<PLUGIN_ROOT>/shared/agent-prompts/review-worker.md`
-
-额外注入：`{{DIFF_CONTENT}}` = `git diff` 输出。
+```
+Bash({
+  command: "PROMPT_DIFF='<git diff 输出>' bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh review-worker --plugin-root <PLUGIN_ROOT> --session <CODEX_SESSION> --session-b <CODEX_B_SESSION>",
+  description: "组装 review-worker prompt"
+})
+```
 
 spawn → 等待 → 按 Critical/Major/Minor/Suggestion 分级。
 
@@ -191,9 +210,12 @@ spawn → 等待 → 按 Critical/Major/Minor/Suggestion 分级。
 
 #### Phase 5：测试（可选）
 
-模板：`<PLUGIN_ROOT>/shared/agent-prompts/test-worker.md`
-
-额外注入：`{{CHANGED_FILES}}` = 变更文件列表。
+```
+Bash({
+  command: "PROMPT_TASK='<需求>' PROMPT_CONTEXT='<上下文>' PROMPT_CHANGED_FILES='<变更文件列表>' bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh test-worker --plugin-root <PLUGIN_ROOT>",
+  description: "组装 test-worker prompt"
+})
+```
 
 spawn → 等待 → 执行后处理协议。
 
@@ -218,25 +240,11 @@ spawn → 等待 → 执行后处理协议。
 
 ---
 
-## 子Agent 模板与占位符
+## 子Agent Prompt 组装
 
-模板路径：`<PLUGIN_ROOT>/shared/agent-prompts/<worker>.md`
+所有子Agent prompt 由 `<PLUGIN_ROOT>/scripts/assemble-prompt.sh` 脚本机械生成，**禁止手动编写或修改脚本输出**。
 
-| Worker | 模板文件 |
-|--------|----------|
-| analyze-worker | `analyze-worker.md` |
-| plan-worker | `plan-worker.md` |
-| execute-worker | `execute-worker.md` |
-| review-worker | `review-worker.md` |
-| test-worker | `test-worker.md` |
-
-**占位符**：
-- `{{TASK_CONTENT}}` — 增强后的需求
-- `{{PROJECT_CONTEXT}}` — 项目上下文
-- `{{SESSION_ID}}` — Codex 会话 ID（resume 用）
-- `{{DECISIONS_CONTENT}}` — 决策集（复杂任务）
-- `{{PLAN_DIR}}` — 状态目录绝对路径
-- `$CLAUDE_PLUGIN_ROOT` / `~/.claude/.ccg` → 必须替换为 PLUGIN_ROOT 绝对路径（子Agent 不继承环境变量）
+脚本读取 `<PLUGIN_ROOT>/shared/agent-prompts/<worker>.md` 模板，替换占位符后输出完整 prompt。详见各 Phase 的调用示例。
 
 ---
 
