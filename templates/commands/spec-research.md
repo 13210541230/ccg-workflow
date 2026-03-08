@@ -47,7 +47,7 @@ description: '需求 → 约束集（并行探索 + OPSX 提案）'
    - Each boundary should be self-contained: no cross-communication needed.
 
 4. **Parallel Multi-Model Exploration**
-   - **CRITICAL**: You MUST launch BOTH Codex AND Gemini in a SINGLE message with TWO Bash tool calls.
+   - **CRITICAL**: You MUST launch BOTH Codex-A AND Codex-B in a SINGLE message with TWO Bash tool calls.
    - **DO NOT** call one model first and wait. Launch BOTH simultaneously with `run_in_background: true`.
    - **工作目录**：`{{WORKDIR}}` 替换为目标工作目录的绝对路径。如果用户通过 `/add-dir` 添加了多个工作区，先确定任务相关的工作区。
 

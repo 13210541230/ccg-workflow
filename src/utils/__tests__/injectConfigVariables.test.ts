@@ -84,6 +84,13 @@ describe('mcpProvider = "skip"', () => {
     expect(result).not.toContain('{{MCP_SEARCH_PARAM}}')
   })
 
+  it('removes {{MCP_PATH_PARAM}} references', () => {
+    const input = 'path: {{MCP_PATH_PARAM}}'
+    const result = injectConfigVariables(input, skipConfig)
+    expect(result).toBe('path: ')
+    expect(result).not.toContain('{{MCP_PATH_PARAM}}')
+  })
+
   it('handles multiple patterns in a single template correctly', () => {
     // Simulates the planner.md template structure
     const input = [
@@ -118,40 +125,57 @@ describe('mcpProvider = "skip"', () => {
     // no MCP references remain
     expect(result).not.toContain('{{MCP_SEARCH_TOOL}}')
     expect(result).not.toContain('mcp__ace-tool__search_context')
+    expect(result).not.toContain('mcp__fast-context__fast_context_search')
   })
 
-  it('does not inject mcp__ace-tool__search_context when skip is selected', () => {
+  it('does not inject any MCP tool references when skip is selected', () => {
     const input = '调用 `{{MCP_SEARCH_TOOL}}` 检索'
     const result = injectConfigVariables(input, skipConfig)
     expect(result).not.toContain('mcp__ace-tool')
-    expect(result).not.toContain('mcp__contextweaver')
+    expect(result).not.toContain('mcp__fast-context')
   })
 })
 
 // ─────────────────────────────────────────────────────────────
-// B. contextweaver provider
+// B. fast-context provider (default)
 // ─────────────────────────────────────────────────────────────
-describe('mcpProvider = "contextweaver"', () => {
-  const cwConfig = { mcpProvider: 'contextweaver' }
-
-  it('replaces {{MCP_SEARCH_TOOL}} with contextweaver tool name', () => {
+describe('mcpProvider = "fast-context" (default)', () => {
+  it('replaces {{MCP_SEARCH_TOOL}} with fast-context tool name', () => {
     const input = '调用 `{{MCP_SEARCH_TOOL}}` 检索'
-    const result = injectConfigVariables(input, cwConfig)
-    expect(result).toContain('mcp__contextweaver__codebase-retrieval')
+    const result = injectConfigVariables(input, { mcpProvider: 'fast-context' })
+    expect(result).toContain('mcp__fast-context__fast_context_search')
     expect(result).not.toContain('{{MCP_SEARCH_TOOL}}')
   })
 
-  it('replaces {{MCP_SEARCH_PARAM}} with information_request', () => {
+  it('replaces {{MCP_SEARCH_PARAM}} with query', () => {
     const input = '{{MCP_SEARCH_PARAM}}'
-    const result = injectConfigVariables(input, cwConfig)
-    expect(result).toBe('information_request')
+    const result = injectConfigVariables(input, { mcpProvider: 'fast-context' })
+    expect(result).toBe('query')
+  })
+
+  it('replaces {{MCP_PATH_PARAM}} with project_path', () => {
+    const input = '{{MCP_PATH_PARAM}}'
+    const result = injectConfigVariables(input, { mcpProvider: 'fast-context' })
+    expect(result).toBe('project_path')
+  })
+
+  it('defaults to fast-context when mcpProvider is not specified', () => {
+    const input = '{{MCP_SEARCH_TOOL}}'
+    const result = injectConfigVariables(input, {})
+    expect(result).toBe('mcp__fast-context__fast_context_search')
+  })
+
+  it('defaults to fast-context when mcpProvider is undefined', () => {
+    const input = '{{MCP_SEARCH_TOOL}}'
+    const result = injectConfigVariables(input, { mcpProvider: undefined })
+    expect(result).toBe('mcp__fast-context__fast_context_search')
   })
 })
 
 // ─────────────────────────────────────────────────────────────
-// C. ace-tool provider (default)
+// C. ace-tool provider (explicit)
 // ─────────────────────────────────────────────────────────────
-describe('mcpProvider = "ace-tool" (default)', () => {
+describe('mcpProvider = "ace-tool" (explicit)', () => {
   it('replaces {{MCP_SEARCH_TOOL}} with ace-tool tool name', () => {
     const input = '调用 `{{MCP_SEARCH_TOOL}}` 检索'
     const result = injectConfigVariables(input, { mcpProvider: 'ace-tool' })
@@ -164,16 +188,10 @@ describe('mcpProvider = "ace-tool" (default)', () => {
     expect(result).toBe('query')
   })
 
-  it('defaults to ace-tool when mcpProvider is not specified', () => {
-    const input = '{{MCP_SEARCH_TOOL}}'
-    const result = injectConfigVariables(input, {})
-    expect(result).toBe('mcp__ace-tool__search_context')
-  })
-
-  it('defaults to ace-tool when mcpProvider is undefined', () => {
-    const input = '{{MCP_SEARCH_TOOL}}'
-    const result = injectConfigVariables(input, { mcpProvider: undefined })
-    expect(result).toBe('mcp__ace-tool__search_context')
+  it('replaces {{MCP_PATH_PARAM}} with project_root_path', () => {
+    const input = '{{MCP_PATH_PARAM}}'
+    const result = injectConfigVariables(input, { mcpProvider: 'ace-tool' })
+    expect(result).toBe('project_root_path')
   })
 })
 
@@ -218,11 +236,9 @@ describe('integration: real templates with skip mode', () => {
       expect(result).not.toContain('{{MCP_SEARCH_TOOL}}')
       expect(result).not.toContain('{{MCP_SEARCH_PARAM}}')
 
-      // No ace-tool references should be injected
+      // No specific MCP tool references should be injected
       expect(result).not.toContain('mcp__ace-tool__search_context')
-
-      // No contextweaver references should be injected
-      expect(result).not.toContain('mcp__contextweaver__codebase-retrieval')
+      expect(result).not.toContain('mcp__fast-context__fast_context_search')
     })
   }
 })

@@ -41,7 +41,7 @@ describe('installWorkflows E2E — mcpProvider="skip"', () => {
     expect(result.installedCommands.length).toBeGreaterThan(0)
   })
 
-  it('generated command files contain no mcp__ace-tool references', async () => {
+  it('generated command files contain no MCP tool references', async () => {
     const cmdDir = join(tmpDir, 'commands', 'ccg')
     const files = collectMdFiles(cmdDir)
     expect(files.length).toBeGreaterThan(0)
@@ -50,12 +50,13 @@ describe('installWorkflows E2E — mcpProvider="skip"', () => {
       const content = readFileSync(file, 'utf-8')
       const rel = file.replace(tmpDir + '/', '')
       expect(content, `${rel} should not contain mcp__ace-tool`).not.toContain('mcp__ace-tool__search_context')
+      expect(content, `${rel} should not contain mcp__fast-context`).not.toContain('mcp__fast-context__fast_context_search')
       expect(content, `${rel} should not contain {{MCP_SEARCH_TOOL}}`).not.toContain('{{MCP_SEARCH_TOOL}}')
       expect(content, `${rel} should not contain {{MCP_SEARCH_PARAM}}`).not.toContain('{{MCP_SEARCH_PARAM}}')
     }
   })
 
-  it('generated agent files contain no mcp__ace-tool references', async () => {
+  it('generated agent files contain no MCP tool references', async () => {
     const agentDir = join(tmpDir, 'agents', 'ccg')
     const files = collectMdFiles(agentDir)
     expect(files.length).toBeGreaterThan(0)
@@ -64,6 +65,7 @@ describe('installWorkflows E2E — mcpProvider="skip"', () => {
       const content = readFileSync(file, 'utf-8')
       const rel = file.replace(tmpDir + '/', '')
       expect(content, `${rel} should not contain mcp__ace-tool`).not.toContain('mcp__ace-tool__search_context')
+      expect(content, `${rel} should not contain mcp__fast-context`).not.toContain('mcp__fast-context__fast_context_search')
       expect(content, `${rel} should not contain {{MCP_SEARCH_TOOL}}`).not.toContain('{{MCP_SEARCH_TOOL}}')
     }
   })
@@ -82,15 +84,46 @@ describe('installWorkflows E2E — mcpProvider="skip"', () => {
 
   it('planner.md frontmatter has no MCP tool in tools declaration', async () => {
     const content = readFileSync(join(tmpDir, 'agents', 'ccg', 'planner.md'), 'utf-8')
-    const toolsLine = content.split('\n').find(l => l.startsWith('tools:'))
+    const toolsLine = content.split('\n').find(l => l.startsWith('tools:'))?.trim()
     expect(toolsLine).toBe('tools: Read, Write')
   })
 })
 
 // ─────────────────────────────────────────────────────────────
-// E2E: installWorkflows with mcpProvider='ace-tool' (control)
+// E2E: installWorkflows with mcpProvider='fast-context' (default)
 // ─────────────────────────────────────────────────────────────
-describe('installWorkflows E2E — mcpProvider="ace-tool" (control)', () => {
+describe('installWorkflows E2E — mcpProvider="fast-context" (default)', () => {
+  const tmpDir = join(tmpdir(), `ccg-test-fc-${Date.now()}`)
+
+  afterAll(async () => {
+    await fs.remove(tmpDir)
+  })
+
+  it('installs all workflows and injects fast-context references', async () => {
+    const result = await installWorkflows(ALL_IDS, tmpDir, true, {
+      mcpProvider: 'fast-context',
+    })
+    expect(result.success).toBe(true)
+    expect(result.errors).toEqual([])
+  })
+
+  it('generated files contain mcp__fast-context__fast_context_search', async () => {
+    const planContent = readFileSync(join(tmpDir, 'commands', 'ccg', 'plan.md'), 'utf-8')
+    expect(planContent).toContain('mcp__fast-context__fast_context_search')
+    expect(planContent).not.toContain('{{MCP_SEARCH_TOOL}}')
+  })
+
+  it('generated agent files contain mcp__fast-context__fast_context_search', async () => {
+    const plannerContent = readFileSync(join(tmpDir, 'agents', 'ccg', 'planner.md'), 'utf-8')
+    expect(plannerContent).toContain('mcp__fast-context__fast_context_search')
+    expect(plannerContent).not.toContain('{{MCP_SEARCH_TOOL}}')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// E2E: installWorkflows with mcpProvider='ace-tool' (explicit)
+// ─────────────────────────────────────────────────────────────
+describe('installWorkflows E2E — mcpProvider="ace-tool" (explicit)', () => {
   const tmpDir = join(tmpdir(), `ccg-test-ace-${Date.now()}`)
 
   afterAll(async () => {
