@@ -22,6 +22,7 @@ set -euo pipefail
 #   PROMPT_PLAN            → {{PLAN_CONTENT}}
 #   PROMPT_DIFF            → {{DIFF_CONTENT}}
 #   PROMPT_CHANGED_FILES   → {{CHANGED_FILES}}
+#   PROMPT_TEAM_NAME       → {{TEAM_NAME}}
 #
 # 输出：完整的 prompt 文本（stdout），可直接用作 Agent prompt
 
@@ -69,6 +70,7 @@ PROMPT="${PROMPT//\{\{ANALYZE_FINDINGS\}\}/${PROMPT_FINDINGS:-}}"
 PROMPT="${PROMPT//\{\{PLAN_CONTENT\}\}/${PROMPT_PLAN:-}}"
 PROMPT="${PROMPT//\{\{DIFF_CONTENT\}\}/${PROMPT_DIFF:-}}"
 PROMPT="${PROMPT//\{\{CHANGED_FILES\}\}/${PROMPT_CHANGED_FILES:-}}"
+PROMPT="${PROMPT//\{\{TEAM_NAME\}\}/${PROMPT_TEAM_NAME:-}}"
 
 # --- 替换 ID 占位符 ---
 PROMPT="${PROMPT//\{\{PLAN_DIR\}\}/${PLAN_DIR}}"

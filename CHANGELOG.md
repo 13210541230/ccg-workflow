@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.74] - 2026-03-09
+
+### ✨ 新功能
+
+- **manage Phase 3/4 双向通信**：基于 Agent Teams 的主 Agent ↔ Worker 阻塞式请求机制
+  - Phase 3 (execute) 和 Phase 4 (review) 从 Agent fire-and-forget 切换到 Teammate + 消息监听循环
+  - execute-worker 支持 4 种请求类型：plan_infeasible / scope_extension / dependency_missing / ambiguity
+  - review-worker 支持 3 种请求类型：critical_found / scope_question / conflict_findings
+  - Agent Teams 不可用时自动降级为旧模式（无双向通信）
+  - assemble-prompt.sh 新增 `{{TEAM_NAME}}` 占位符
+  - progress.md 新增消息日志表
+
+---
+
 ## [1.7.73] - 2026-03-09
 
 ### ✨ 新功能

@@ -1,12 +1,18 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-09 (v1.7.73)
+**Last Updated**: 2026-03-09 (v1.7.74)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-09 (v1.7.74 - manage 双向通信)
+- manage Phase 3/4 改造为 Agent Teams Teammate 模式，支持 Worker ↔ 主 Agent 阻塞式请求
+- execute-worker 新增 4 种通信触发场景，review-worker 新增 3 种
+- assemble-prompt.sh 新增 `{{TEAM_NAME}}` 占位符，progress.md 新增消息日志表
+- Agent Teams 不可用时自动降级为旧模式
 
 ### 2026-03-09 (v1.7.73 - codex-operator 人机反转代理)
 - 新增 `codex-operator` agent：Agent 扮演人类审查者，Codex(GPT-5.4) 自主执行，5 轮交互上限

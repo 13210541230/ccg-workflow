@@ -138,6 +138,7 @@ Bash({
 | `PROMPT_PLAN` | 实施计划内容 | Phase 3 |
 | `PROMPT_DIFF` | `git diff` 输出 | Phase 4 |
 | `PROMPT_CHANGED_FILES` | 变更文件列表 | Phase 5 |
+| `PROMPT_TEAM_NAME` | 团队名称（Teammate 模式） | Phase 3, 4 |
 
 **第 2 步：用脚本输出作为 prompt 原封不动地 spawn 子Agent**
 
@@ -192,35 +193,140 @@ spawn → 等待 → 更新 `task_plan.md` → 执行后处理协议。
 
 **Hard Stop** — 展示计划，等用户确认 Y 后自动进入 Phase 3。
 
-#### Phase 3：实施
+#### Phase 3：实施（Teammate 双向通信模式）
 
 > **硬约束**：主Agent禁止直接 Edit/Write 项目源代码。
+> **前置检测**：若环境变量 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` 未设为 `1`，降级为旧模式（直接用 Agent 工具 spawn，无双向通信）。
+
+**第 1 步：创建临时团队**
+
+```
+Teammate({ operation: "spawnTeam", team_name: "manage-execute-<timestamp>" })
+```
+
+**第 2 步：组装 prompt（同现有逻辑，新增 PROMPT_TEAM_NAME）**
 
 ```
 Bash({
-  command: "PROMPT_TASK='<需求>' PROMPT_CONTEXT='<上下文>' PROMPT_DECISIONS='<决策>' PROMPT_FINDINGS='<分析结论>' PROMPT_PLAN='<确认后的计划>' bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh execute-worker --plugin-root <PLUGIN_ROOT> --plan-dir <PLAN_DIR> --session <CODEX_SESSION>",
-  description: "组装 execute-worker prompt"
+  command: "PROMPT_TASK='<需求>' PROMPT_CONTEXT='<上下文>' PROMPT_DECISIONS='<决策>' PROMPT_FINDINGS='<分析结论>' PROMPT_PLAN='<确认后的计划>' PROMPT_TEAM_NAME='manage-execute-<timestamp>' bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh execute-worker --plugin-root <PLUGIN_ROOT> --plan-dir <PLAN_DIR> --session <CODEX_SESSION>",
+  description: "组装 execute-worker prompt（Teammate 模式）"
 })
 ```
 
-大型任务可拆为多个并行 worker（文件范围不重叠），每个 worker 都必须通过 assemble-prompt.sh 生成 prompt。
+**第 3 步：spawn Worker 为团队成员**
 
-spawn → 等待 → 执行后处理协议 → 自动进入 Phase 4。
+```
+Task({
+  team_name: "manage-execute-<timestamp>",
+  name: "execute-worker",
+  subagent_type: "agent-teams:team-implementer",
+  prompt: "<第 2 步 Bash 输出的完整文本>"
+})
+```
 
-#### Phase 4：审查
+**第 4 步：消息监听循环**
+
+```
+WHILE execute-worker 未完成:
+  1. 检查 TaskList 获取 worker 状态
+  2. IF 收到 message (from: "execute-worker"):
+     a. 解析 REQUEST_TYPE（plan_infeasible / scope_extension / dependency_missing / ambiguity）
+     b. 主 Agent 根据类型决策：
+        - plan_infeasible → 调整计划或升级给用户
+        - scope_extension → 评估合理性，批准/拒绝
+        - dependency_missing → 提供替代方案或升级
+        - ambiguity → 选择推荐选项或指定方案
+     c. 回复: message({ recipient: "execute-worker", content: "<决策结果>" })
+     d. 记录到 progress.md 消息日志表
+  3. IF worker 状态 = completed → 跳出循环
+  4. IF 超时（30 分钟）→ shutdown_request → 升级给用户
+```
+
+**第 5 步：清理团队**
+
+```
+发送 shutdown_request → 等待 shutdown_response → Teammate cleanup
+```
+
+**第 6 步：执行「阶段完成后处理协议」→ 自动进入 Phase 4**
+
+大型任务可拆为多个并行 worker（文件范围不重叠），每个 worker 都在同一团队内 spawn，共享消息监听循环。
+
+**降级模式**（Agent Teams 不可用时）：
+
+使用现有 Agent 工具 spawn，无 PROMPT_TEAM_NAME 注入，通信协议段自动跳过：
+
+```
+Agent({
+  subagent_type: "general-purpose",
+  prompt: "<assemble-prompt.sh 输出（无 TEAM_NAME）>",
+  description: "execute-worker（降级模式）",
+  run_in_background: true
+})
+```
+
+#### Phase 4：审查（Teammate 双向通信模式）
+
+> **前置检测**：同 Phase 3，Agent Teams 不可用时降级为旧模式。
+
+**第 1 步：创建临时团队**
+
+```
+Teammate({ operation: "spawnTeam", team_name: "manage-review-<timestamp>" })
+```
+
+**第 2 步：组装 prompt**
 
 ```
 Bash({
-  command: "PROMPT_DIFF='<git diff 输出>' bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh review-worker --plugin-root <PLUGIN_ROOT> --session <CODEX_SESSION> --session-b <CODEX_B_SESSION>",
-  description: "组装 review-worker prompt"
+  command: "PROMPT_DIFF='<git diff 输出>' PROMPT_TEAM_NAME='manage-review-<timestamp>' bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh review-worker --plugin-root <PLUGIN_ROOT> --session <CODEX_SESSION> --session-b <CODEX_B_SESSION>",
+  description: "组装 review-worker prompt（Teammate 模式）"
 })
 ```
 
-spawn → 等待 → 按 Critical/Major/Minor/Suggestion 分级。
+**第 3 步：spawn Worker 为团队成员**
+
+```
+Task({
+  team_name: "manage-review-<timestamp>",
+  name: "review-worker",
+  subagent_type: "agent-teams:team-reviewer",
+  prompt: "<第 2 步 Bash 输出的完整文本>"
+})
+```
+
+**第 4 步：消息监听循环**
+
+```
+WHILE review-worker 未完成:
+  1. 检查 TaskList 获取 worker 状态
+  2. IF 收到 message (from: "review-worker"):
+     a. 解析 REQUEST_TYPE（critical_found / scope_question / conflict_findings）
+     b. 主 Agent 根据类型决策：
+        - critical_found → 决定处理方式（回退 Phase 3 / 局部修复 / 标记为已知风险）
+        - scope_question → 确认是否属于正常偏差
+        - conflict_findings → 仲裁 Codex-A 与 Codex-B 的矛盾
+     c. 回复: message({ recipient: "review-worker", content: "<决策结果>" })
+     d. 记录到 progress.md 消息日志表
+  3. IF worker 状态 = completed → 跳出循环
+  4. IF 超时（30 分钟）→ shutdown_request → 升级给用户
+```
+
+**第 5 步：清理团队**
+
+```
+发送 shutdown_request → 等待 shutdown_response → Teammate cleanup
+```
+
+**第 6 步：后处理**
+
+按 Critical/Major/Minor/Suggestion 分级审查结果。
 
 **Critical 自动回退**：回退 Phase 3 修复 → 再审查，最多 2 轮。仍有 Critical → 升级给用户。
 
 无 Critical → 自动进入 Phase 5。
+
+**降级模式**（Agent Teams 不可用时）：同 Phase 3，使用 Agent 工具 spawn，无双向通信。
 
 #### Phase 5：测试（可选）
 
@@ -282,6 +388,7 @@ spawn → 等待 → 执行后处理协议。
 3. **源码隔离** — 主Agent仅改 `.claude/plan/`，源码由 execute-worker 改
 4. **状态可追踪** — 每阶段更新 progress.md
 5. **止损机制** — 未验证不进入下一阶段
+6. **双向通信** — Phase 3/4 支持 Worker 阻塞式请求，主 Agent 监听并回复；Agent Teams 不可用时自动降级
 
 ---
 

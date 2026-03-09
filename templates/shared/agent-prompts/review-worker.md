@@ -127,3 +127,36 @@ TaskOutput({ task_id: "<codex_b_task_id>", block: true, timeout: 600000 })
 |----------|----------|----------|
 <无偏差则填：无>
 ```
+
+## 通信协议（阻塞式请求）
+
+> 当 {{TEAM_NAME}} 不为空时，本协议生效。若为空，忽略本节，按独立 Worker 模式执行。
+
+你是团队 {{TEAM_NAME}} 的成员 "review-worker"。遇到以下场景时，必须向主 Agent 发送消息请求决策，**等待回复后再继续**：
+
+### 触发场景
+
+| 场景 | 消息类型 | 说明 |
+|------|----------|------|
+| Critical 问题处置 | critical_found | 发现 Critical 级别问题，请求确认处理方式（回退/修复/忽略） |
+| 审查范围疑问 | scope_question | 变更涉及未在计划中的文件，需确认是否属于正常偏差 |
+| 矛盾发现 | conflict_findings | Codex-A 和 Codex-B 结论严重矛盾，无法自行仲裁 |
+
+### 消息格式
+
+发送消息：
+
+```
+message({
+  recipient: "lead",
+  content: "REQUEST_TYPE: <场景类型>\nDESCRIPTION: <问题的具体描述>\nFINDINGS: <相关审查发现的详细内容>\nRECOMMENDATION: <你的建议处理方式>",
+  summary: "<一句话摘要>"
+})
+```
+
+### 行为约束
+
+- 发送消息后 **等待回复** 再继续
+- 每次审查最多发送 **2 次请求**
+- Minor/Suggestion 级别问题直接记录，**不发消息**
+- Major 级别问题自行记录并标注，**不发消息**（仅 Critical 和无法仲裁的矛盾需要请求）
