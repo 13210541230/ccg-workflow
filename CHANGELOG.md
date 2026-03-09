@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.73] - 2026-03-09
+
+### ✨ 新功能
+
+- **codex-operator 人机反转代理**：新增 `templates/commands/agents/codex-operator.md`
+  - Agent 扮演"人类审查者"，Codex 扮演"自主执行者"（GPT-5.4）
+  - 支持 6 种 Codex 角色（analyzer/architect/debugger/optimizer/reviewer/tester）
+  - 指挥-执行-审查循环，最多 5 轮交互，git 安全网保障
+
+### 🐛 修复
+
+- **manage.md 后台 Agent 等待机制**：修复 LLM 尝试 resume 仍在运行的 Agent 导致报错
+  - 新增"第 3 步：等待后台 Agent 完成"说明自动 `<task-notification>` 机制
+  - 禁止主动轮询/resume 运行中的 Agent
+  - 异常处理改为"重新 spawn 新 Agent"替代"resume 失败 Agent"
+
+---
+
 ## [1.7.71] - 2026-03-08
 
 ### ♻️ 优化

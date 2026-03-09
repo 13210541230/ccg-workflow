@@ -8,6 +8,10 @@
 
 ## 变更记录 (Changelog)
 
+### 2026-03-09 (codex-operator 子Agent)
+- 新增 `codex-operator.md` 通用 Codex 代理子Agent（迭代编排，最多 5 轮）
+- 统计更新：4 -> 5 子智能体
+
 ### 2026-02-25 (插件集成)
 - 新增 `manage.md` 主Agent调度命令
 - `debug.md` 集成 sequential-thinking
@@ -32,10 +36,11 @@
 ```
 templates/
 +-- commands/              # 27 个斜杠命令模板 -> ~/.claude/commands/ccg/
-|   +-- agents/            # 4 个子智能体 -> ~/.claude/agents/ccg/
+|   +-- agents/            # 5 个子智能体 -> ~/.claude/agents/ccg/
 |   |   +-- planner.md
 |   |   +-- ui-ux-designer.md
 |   |   +-- init-architect.md
+|   |   +-- codex-operator.md
 |   +-- get-current-datetime.md
 |   +-- workflow.md         # 完整 6 阶段工作流
 |   +-- plan.md             # 多模型协作规划

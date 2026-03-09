@@ -152,6 +152,20 @@ Agent({
 
 **自检**：若 Bash 输出包含 `[assemble-prompt] 错误` 或为空，说明脚本执行失败，排查后重试。
 
+**第 3 步：等待后台 Agent 完成**
+
+后台 Agent 完成时系统会**自动发送 `<task-notification>` 通知**，你会在对话中收到完成消息。
+
+- **禁止**主动轮询、resume、或 Read 输出文件来检查进度
+- **禁止**在 Agent 仍在运行时尝试 resume（会报 "Cannot resume: still running" 错误）
+- 等待期间可以做**不冲突的工作**（如更新状态文件、准备下一阶段的环境变量），或向用户简要说明正在等待
+- 收到通知后，从 Agent 返回的 `result` 中提取子Agent产出，进入「阶段完成后处理协议」
+
+**关于 Agent resume 的约束**：
+- `resume` 只能用于**已完成**的 Agent，且**必须提供 `prompt` 参数**
+- 正确用法：`Agent({ resume: "<agent_id>", prompt: "继续执行", description: "..." })`
+- 禁止对正在运行的 Agent 调用 resume
+
 ---
 
 #### Phase 1：分析
@@ -252,8 +266,8 @@ spawn → 等待 → 执行后处理协议。
 
 | 异常场景 | 决策 |
 |----------|------|
-| 子Agent输出为空 | 重试 1 次（resume），仍失败 → 升级给用户 |
-| 子Agent超时 | 继续轮询 TaskOutput，绝不 Kill |
+| 子Agent输出为空 | 用相同 prompt 重新 spawn 一个新 Agent（不是 resume），仍失败 → 升级给用户 |
+| 子Agent长时间未完成 | 等待自动通知，绝不 Kill；可用 Read 查看输出文件了解进度 |
 | Critical 审查问题 | 回退 Phase 3，最多 2 轮 |
 | 同一 Worker ≥ 3 次失败 | 停止重试，AskUserQuestion 请用户决策 |
 | 依赖阶段失败 | 终止后续，通知用户 |
@@ -273,7 +287,9 @@ spawn → 等待 → 执行后处理协议。
 
 ## 输出丢失检测
 
-TaskOutput 返回后检查 `<output>` 是否为空：
-1. 用 `Read` 读取输出文件（Windows 绝对路径，非 Git Bash 格式）
-2. 若临时文件已清理 → `Glob` 查找 `~/.claude/.ccg/outputs/*.txt`
-3. 仍无 → 用 `resume` 重新调用
+子Agent 返回结果中 `result` 为空时：
+1. 用 `Read` 读取 Agent 的输出文件（路径在 spawn 时返回的 `output_file` 中，使用 Windows 绝对路径格式）
+2. 若输出文件也为空或不存在 → 用相同 prompt **重新 spawn 一个新 Agent**（不是 resume 旧的）
+3. 仍失败 → 升级给用户
+
+**注意**：不要尝试 resume 已完成但输出为空的 Agent——空输出通常意味着 Agent 内部出错，resume 不会产生新结果。应该重新 spawn。

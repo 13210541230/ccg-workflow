@@ -1,12 +1,17 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-08 (v1.7.71)
+**Last Updated**: 2026-03-09 (v1.7.73)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-09 (v1.7.73 - codex-operator 人机反转代理)
+- 新增 `codex-operator` agent：Agent 扮演人类审查者，Codex(GPT-5.4) 自主执行，5 轮交互上限
+- 修复 manage.md 后台 Agent 等待机制缺失，防止 resume 运行中 Agent 报错
+- agents 数量 4→5
 
 ### 2026-03-08 (v1.7.71 - manage 轻量化重构)
 - manage.md 从 853→269 行，转为纯编排器（删除多模型调用规范、外置状态文件格式）
@@ -84,7 +89,7 @@ graph TD
     Plugin --> Init["一键安装"]
 
     Init --> Commands["commands/<br/>27 个命令"]
-    Init --> Agents["agents/<br/>4 个子智能体"]
+    Init --> Agents["agents/<br/>5 个子智能体"]
     Init --> Prompts["prompts/<br/>19 个专家提示词"]
     Init --> Binary["bin/<br/>codeagent-wrapper"]
 
@@ -116,7 +121,7 @@ graph TD
     B --> B3["i18n/<br/>国际化"]
     B --> B4["types/<br/>类型定义"]
 
-    D --> D1["commands/<br/>26 模板 + 4 agents"]
+    D --> D1["commands/<br/>26 模板 + 5 agents"]
     D --> D2["prompts/<br/>19 专家提示词"]
     D --> D3["output-styles/<br/>5 输出风格"]
     D --> D4["bin/<br/>persist 脚本"]
@@ -356,7 +361,7 @@ codeagent-wrapper/
 ```
 templates/
 +-- commands/                  # 26 个斜杠命令
-+-- commands/agents/           # 4 个子智能体
++-- commands/agents/           # 5 个子智能体
 +-- prompts/codex/             # 6 个 Codex 提示词
 +-- prompts/gemini/            # 7 个 Gemini 提示词
 +-- prompts/claude/            # 6 个 Claude 提示词
