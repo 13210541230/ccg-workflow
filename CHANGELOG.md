@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.77] - 2026-03-10
+
+### ♻️ 重构
+
+- **manage SubAgent 文件化 Prompt 管道**：将环境变量传参改为文件读写模式，消除 Claude 自行组装指令的问题
+  - `assemble-prompt.sh` 新增 `--input-dir` / `--output` 参数，从文件读取内容并写入输出文件，删除所有 `PROMPT_*` 环境变量逻辑
+  - `manage.md` SubAgent 派发从 2 步改为 4 步（Write inputs → Bash assemble → Read prompt → Agent），强化硬约束
+  - `manage-state-format.md` 新增 `inputs/` 和 `prompts/` 目录规范及文件清单
+
+---
+
 ## [1.7.76] - 2026-03-10
 
 ### 🐛 修复

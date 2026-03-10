@@ -81,6 +81,8 @@ Glob({ pattern: ".claude/plan/*/progress.md" })
 - `progress.md` — 初始状态 `initializing`
 - `findings.md` — 空模板
 - `decisions.md` — 空模板
+- `inputs/` — 空目录（子Agent prompt 输入文件）
+- `prompts/` — 空目录（子Agent 组装后的完整 prompt）
 
 #### 0.5 复杂度评估
 
@@ -114,52 +116,65 @@ Glob({ pattern: ".claude/plan/*/progress.md" })
 
 ### Phase 1-5：子Agent 派发（统一流程）
 
-> **硬约束**：每个子Agent的 prompt **必须**由 `assemble-prompt.sh` 脚本从模板生成。**禁止**自己编写 prompt、跳过脚本、或用 Agent 工具直接派发自定义内容。
+> **硬约束**：每个子Agent的 prompt **必须**由 `assemble-prompt.sh` 脚本从模板生成并写入文件。**禁止**自己编写 prompt、跳过脚本、或用 Agent 工具直接派发自定义内容。
 
-每个阶段严格按以下 2 步执行：
+每个阶段严格按以下 4 步执行：
 
-**第 1 步：调用 assemble-prompt.sh 生成完整 prompt**
+**第 1 步：写入 input 文件**
+
+用 Write 工具将本阶段所需的动态内容写入 `<PLAN_DIR>/inputs/` 下的对应文件：
+
+| 文件 | 内容来源 | 使用阶段 |
+|------|----------|----------|
+| `task.md` | 增强后的需求描述 | 全部（Phase 0 首次写入，测试失败/审查 Critical 时追加修复要求） |
+| `context.md` | 项目上下文 | Phase 1, 2, 3, 5（Phase 0 首次写入，通常不变） |
+| `decisions.md` | decisions.md 内容 | Phase 1, 2, 3（Phase 0.5 写入） |
+| `findings.md` | 分析阶段结论 | Phase 2, 3（Phase 1 完成后写入） |
+| `plan.md` | 确认后的实施计划 | Phase 3（Phase 2 确认后写入） |
+| `diff.txt` | `git diff` 输出 | Phase 4（每次审查前用 Bash 获取并 Write） |
+| `changed-files.txt` | 变更文件列表 | Phase 5（每次测试前用 Bash 获取并 Write） |
+| `team-name.txt` | 团队名称 | Phase 3, 4（Teammate 模式时写入） |
+
+- 已在前序阶段写入且未变化的文件**无需重复写入**
+- 需要更新的文件直接用 Write 覆写
+
+**第 2 步：运行 assemble-prompt.sh 生成 prompt 文件**
 
 ```
 Bash({
-  command: "PROMPT_TASK='<增强后的需求>' PROMPT_CONTEXT='<项目上下文>' PROMPT_DECISIONS='<decisions.md 内容>' bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh <worker-name> --plugin-root <PLUGIN_ROOT> --plan-dir <PLAN_DIR绝对路径> [--session <CODEX_SESSION>] [--session-b <CODEX_B_SESSION>]",
+  command: "bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh <worker-name> --plugin-root <PLUGIN_ROOT> --input-dir <PLAN_DIR>/inputs --output <PLAN_DIR>/prompts/<worker-name>.prompt --plan-dir <PLAN_DIR> [--session <CODEX_SESSION>] [--session-b <CODEX_B_SESSION>]",
   description: "组装 <worker-name> prompt"
 })
 ```
 
-环境变量（按阶段按需提供）：
+**自检**：Bash 输出应包含 `已写入:` 和文件大小。若包含 `[assemble-prompt] 错误` 或输出为空，排查后重试。
 
-| 变量 | 说明 | 使用阶段 |
-|------|------|----------|
-| `PROMPT_TASK` | 增强后的需求描述 | 全部 |
-| `PROMPT_CONTEXT` | 项目上下文 | Phase 1, 2, 3, 5 |
-| `PROMPT_DECISIONS` | decisions.md 内容 | Phase 1, 2, 3 |
-| `PROMPT_FINDINGS` | 分析阶段结论 | Phase 2, 3 |
-| `PROMPT_PLAN` | 实施计划内容 | Phase 3 |
-| `PROMPT_DIFF` | `git diff` 输出 | Phase 4 |
-| `PROMPT_CHANGED_FILES` | 变更文件列表 | Phase 5 |
-| `PROMPT_TEAM_NAME` | 团队名称（Teammate 模式） | Phase 3, 4 |
+**第 3 步：读取 prompt 文件并 spawn 子Agent**
 
-**第 2 步：用脚本输出作为 prompt 原封不动地 spawn 子Agent**
+```
+Read({ file_path: "<PLAN_DIR>/prompts/<worker-name>.prompt" })
+```
+
+然后：
 
 ```
 Agent({
   subagent_type: "general-purpose",
-  prompt: "<第 1 步 Bash 输出的完整文本，不得修改或删减>",
+  prompt: "<上一步 Read 返回的完整文本>",
   description: "<阶段描述>",
   run_in_background: true
 })
 ```
 
-**自检**：若 Bash 输出包含 `[assemble-prompt] 错误` 或为空，说明脚本执行失败，排查后重试。
+> **硬约束**：Agent 的 prompt 参数**必须且只能**是 Read 返回的完整文本。**禁止**修改、删减、概括、重述、补充任何内容。若 Read 返回为空或报错，重新执行第 2 步，**不得**自行编写 prompt。
 
-**第 3 步：等待后台 Agent 完成**
+**第 4 步：等待后台 Agent 完成**
 
 后台 Agent 完成时系统会**自动发送 `<task-notification>` 通知**，你会在对话中收到完成消息。
 
 - **禁止**主动轮询、resume、或 Read 输出文件来检查进度
 - **禁止**在 Agent 仍在运行时尝试 resume（会报 "Cannot resume: still running" 错误）
-- 等待期间可以做**不冲突的工作**（如更新状态文件、准备下一阶段的环境变量），或向用户简要说明正在等待
+- 等待期间可以做**不冲突的工作**（如更新状态文件、准备下一阶段的 input 文件），或向用户简要说明正在等待
 - 收到通知后，从 Agent 返回的 `result` 中提取子Agent产出，进入「阶段完成后处理协议」
 
 **关于 Agent resume 的约束**：
@@ -171,25 +186,33 @@ Agent({
 
 #### Phase 1：分析
 
+第 1 步（写入 input）：确认 `inputs/task.md`、`inputs/context.md`、`inputs/decisions.md` 已写入。
+
+第 2 步（组装 prompt）：
+
 ```
 Bash({
-  command: "PROMPT_TASK='<需求>' PROMPT_CONTEXT='<上下文>' PROMPT_DECISIONS='<决策>' bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh analyze-worker --plugin-root <PLUGIN_ROOT> --plan-dir <PLAN_DIR>",
+  command: "bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh analyze-worker --plugin-root <PLUGIN_ROOT> --input-dir <PLAN_DIR>/inputs --output <PLAN_DIR>/prompts/analyze-worker.prompt --plan-dir <PLAN_DIR>",
   description: "组装 analyze-worker prompt"
 })
 ```
 
-spawn → 等待完成 → 执行「阶段完成后处理协议」→ 自动进入 Phase 2。
+第 3 步（spawn）：Read prompt 文件 → Agent spawn → 等待完成 → 执行「阶段完成后处理协议」→ 自动进入 Phase 2。
 
 #### Phase 2：规划
 
+第 1 步（写入 input）：将 Phase 1 分析结论写入 `inputs/findings.md`。
+
+第 2 步（组装 prompt）：
+
 ```
 Bash({
-  command: "PROMPT_TASK='<需求>' PROMPT_CONTEXT='<上下文>' PROMPT_DECISIONS='<决策>' PROMPT_FINDINGS='<Phase 1 分析结论>' bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh plan-worker --plugin-root <PLUGIN_ROOT> --plan-dir <PLAN_DIR> --session <CODEX_SESSION> --session-b <CODEX_B_SESSION>",
+  command: "bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh plan-worker --plugin-root <PLUGIN_ROOT> --input-dir <PLAN_DIR>/inputs --output <PLAN_DIR>/prompts/plan-worker.prompt --plan-dir <PLAN_DIR> --session <CODEX_SESSION> --session-b <CODEX_B_SESSION>",
   description: "组装 plan-worker prompt"
 })
 ```
 
-spawn → 等待 → 更新 `task_plan.md` → 执行后处理协议。
+第 3 步（spawn）：Read prompt 文件 → Agent spawn → 等待 → 更新 `task_plan.md` → 执行后处理协议。
 
 **Hard Stop** — 展示计划，等用户确认 Y 后自动进入 Phase 3。
 
@@ -221,16 +244,18 @@ Phase 3/4/5 形成**迭代循环**，而非线性流水线：
 
 按「Phase 1-5 子Agent 派发统一流程」执行。
 
-组装 prompt：
+第 1 步（写入 input）：将确认后的计划写入 `inputs/plan.md`。Teammate 模式时写入 `inputs/team-name.txt`。
+
+第 2 步（组装 prompt）：
 
 ```
 Bash({
-  command: "PROMPT_TASK='<需求>' PROMPT_CONTEXT='<上下文>' PROMPT_DECISIONS='<决策>' PROMPT_FINDINGS='<分析结论>' PROMPT_PLAN='<确认后的计划>' [PROMPT_TEAM_NAME='<team_name>'] bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh execute-worker --plugin-root <PLUGIN_ROOT> --plan-dir <PLAN_DIR> --session <CODEX_SESSION>",
+  command: "bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh execute-worker --plugin-root <PLUGIN_ROOT> --input-dir <PLAN_DIR>/inputs --output <PLAN_DIR>/prompts/execute-worker.prompt --plan-dir <PLAN_DIR> --session <CODEX_SESSION>",
   description: "组装 execute-worker prompt"
 })
 ```
 
-spawn → 等待 → 执行「阶段完成后处理协议」→ **自动进入 Phase 5（测试）**。
+第 3 步（spawn）：Read prompt 文件 → Agent spawn → 等待 → 执行「阶段完成后处理协议」→ **自动进入 Phase 5（测试）**。
 
 **Teammate 模式**（Agent Teams 可用时）：创建团队 → spawn 为 team-implementer → 消息监听循环 → 清理团队。消息类型：`plan_infeasible` / `scope_extension` / `dependency_missing` / `ambiguity`。
 
@@ -263,22 +288,24 @@ AskUserQuestion({
 
 **若可测试**：
 
-组装 prompt：
+第 1 步（写入 input）：将变更文件列表写入 `inputs/changed-files.txt`。
+
+第 2 步（组装 prompt）：
 
 ```
 Bash({
-  command: "PROMPT_TASK='<需求>' PROMPT_CONTEXT='<上下文>' PROMPT_CHANGED_FILES='<变更文件列表>' bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh test-worker --plugin-root <PLUGIN_ROOT>",
+  command: "bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh test-worker --plugin-root <PLUGIN_ROOT> --input-dir <PLAN_DIR>/inputs --output <PLAN_DIR>/prompts/test-worker.prompt --plan-dir <PLAN_DIR>",
   description: "组装 test-worker prompt"
 })
 ```
 
-spawn → 等待 → 执行「阶段完成后处理协议」。
+第 3 步（spawn）：Read prompt 文件 → Agent spawn → 等待 → 执行「阶段完成后处理协议」。
 
 **第 2 步：评估测试结果**
 
 - 全部通过 → 进入 Phase 4（审查）
 - 有失败 → 记录失败详情到 `progress.md`，**回退到 Phase 3**：
-  - 将测试失败信息注入 `PROMPT_TASK`（追加失败详情和修复要求）
+  - 将测试失败信息追加到 `inputs/task.md`（追加失败详情和修复要求）
   - 重新 spawn execute-worker 修复代码（**禁止主Agent自己修复**）
   - `ITERATION += 1`，检查止损条件
 
@@ -288,16 +315,18 @@ spawn → 等待 → 执行「阶段完成后处理协议」。
 
 按「Phase 1-5 子Agent 派发统一流程」执行。
 
-组装 prompt：
+第 1 步（写入 input）：将 `git diff` 输出写入 `inputs/diff.txt`。Teammate 模式时写入 `inputs/team-name.txt`。
+
+第 2 步（组装 prompt）：
 
 ```
 Bash({
-  command: "PROMPT_DIFF='<git diff 输出>' [PROMPT_TEAM_NAME='<team_name>'] bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh review-worker --plugin-root <PLUGIN_ROOT> --session <CODEX_SESSION> --session-b <CODEX_B_SESSION>",
+  command: "bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh review-worker --plugin-root <PLUGIN_ROOT> --input-dir <PLAN_DIR>/inputs --output <PLAN_DIR>/prompts/review-worker.prompt --plan-dir <PLAN_DIR> --session <CODEX_SESSION> --session-b <CODEX_B_SESSION>",
   description: "组装 review-worker prompt"
 })
 ```
 
-spawn → 等待 → 执行「阶段完成后处理协议」。
+第 3 步（spawn）：Read prompt 文件 → Agent spawn → 等待 → 执行「阶段完成后处理协议」。
 
 **Teammate 模式**：同 Phase 3，消息类型：`critical_found` / `scope_question` / `conflict_findings`。
 
@@ -308,7 +337,7 @@ spawn → 等待 → 执行「阶段完成后处理协议」。
 - **无 Critical** → 退出迭代循环 → 进入「完成」
 - **有 Critical** → **必须重新 spawn execute-worker 子Agent 修复**（禁止主Agent直接 Edit/Write 源码）：
   1. 提取 Critical 问题列表，构造修复需求描述
-  2. 将 Critical 问题和修复要求注入 `PROMPT_TASK`
+  2. 将 Critical 问题和修复要求追加到 `inputs/task.md`
   3. 重新执行 Phase 3（spawn execute-worker）→ Phase 5（测试）→ Phase 4（审查）
   4. `ITERATION += 1`，检查止损条件
 
@@ -344,9 +373,12 @@ AskUserQuestion({
 
 ## 子Agent Prompt 组装
 
-所有子Agent prompt 由 `<PLUGIN_ROOT>/scripts/assemble-prompt.sh` 脚本机械生成，**禁止手动编写或修改脚本输出**。
+所有子Agent prompt 由 `<PLUGIN_ROOT>/scripts/assemble-prompt.sh` 脚本机械生成：
+1. 从 `<PLAN_DIR>/inputs/` 读取动态内容文件
+2. 替换 `<PLUGIN_ROOT>/shared/agent-prompts/<worker>.md` 模板中的占位符
+3. 写入 `<PLAN_DIR>/prompts/<worker>.prompt`
 
-脚本读取 `<PLUGIN_ROOT>/shared/agent-prompts/<worker>.md` 模板，替换占位符后输出完整 prompt。详见各 Phase 的调用示例。
+**禁止手动编写 prompt 或修改脚本输出文件**。主Agent通过 Read 工具读取 prompt 文件后，原封不动传给 Agent 工具。
 
 ---
 

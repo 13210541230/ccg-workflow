@@ -1,12 +1,17 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-10 (v1.7.76)
+**Last Updated**: 2026-03-10 (v1.7.77)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-10 (v1.7.77 - manage 文件化 Prompt 管道)
+- assemble-prompt.sh 重构为文件读写模式（`--input-dir` / `--output`），删除环境变量传参
+- manage.md SubAgent 派发改为 4 步文件化管道（Write → Bash → Read → Agent）
+- manage-state-format.md 新增 inputs/prompts 目录规范
 
 ### 2026-03-10 (v1.7.76 - .gitattributes CRLF 自保护)
 - .gitattributes 添加自保护规则防止自身被 CRLF 化

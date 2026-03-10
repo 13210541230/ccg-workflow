@@ -10,6 +10,8 @@
 | `decisions.md` | 讨论阶段确认的关键决策集（复杂任务） | Phase 0.5 写入，后续只读 |
 | `progress.md` | 各阶段状态 + 时间线 + 阶段产出摘要 | 动态，每阶段更新 |
 | `findings.md` | 子Agent产出的发现/问题/审查结果 | 累积追加 |
+| `inputs/` 目录 | 子Agent prompt 的动态输入内容（task.md / context.md / decisions.md 等） | 按阶段写入，可跨阶段复用 |
+| `prompts/` 目录 | assemble-prompt.sh 组装后的完整 prompt 文件 | 每次 spawn 前覆写 |
 
 ## progress.md 模板
 
@@ -109,3 +111,16 @@
 ## 决策摘要（供后续阶段引用）
 <将所有已确认决策整理为一段简洁的约束描述>
 ```
+
+## inputs/ 文件清单
+
+| 文件 | 对应占位符 | 写入时机 |
+|------|-----------|----------|
+| `task.md` | `{{TASK_CONTENT}}` | Phase 0（增强后需求），测试失败/审查 Critical 时追加 |
+| `context.md` | `{{PROJECT_CONTEXT}}` | Phase 0，通常不变 |
+| `decisions.md` | `{{DECISIONS_CONTENT}}` | Phase 0.5 讨论结束后 |
+| `findings.md` | `{{ANALYZE_FINDINGS}}` | Phase 1 完成后 |
+| `plan.md` | `{{PLAN_CONTENT}}` | Phase 2 用户确认后 |
+| `diff.txt` | `{{DIFF_CONTENT}}` | Phase 4 前（git diff 输出） |
+| `changed-files.txt` | `{{CHANGED_FILES}}` | Phase 5 前 |
+| `team-name.txt` | `{{TEAM_NAME}}` | Phase 3/4 Teammate 模式时 |
