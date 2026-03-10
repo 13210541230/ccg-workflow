@@ -1,12 +1,16 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-10 (v1.7.75)
+**Last Updated**: 2026-03-10 (v1.7.76)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-10 (v1.7.76 - .gitattributes CRLF 自保护)
+- .gitattributes 添加自保护规则防止自身被 CRLF 化
+- ccg-plugin run-wrapper glob 改为直接路径 + 强制重新索引
 
 ### 2026-03-10 (v1.7.75 - manage 迭代循环 + CRLF 修复)
 - 修复 CRLF 行尾导致所有 .sh 脚本在 Windows 上无法执行（新增 .gitattributes + 构建时 LF 强制）

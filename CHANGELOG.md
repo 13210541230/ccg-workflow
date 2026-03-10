@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.76] - 2026-03-10
+
+### 🐛 修复
+
+- **`.gitattributes` 自保护**：添加 `.gitattributes text eol=lf` 规则防止 `.gitattributes` 自身被 CRLF 化导致规则失效
+- **ccg-plugin `run-wrapper` CRLF 残留**：`git checkout` 不触发重新规范化，改用 `bin/run-wrapper` 直接路径替代 `**/bin/run-wrapper` glob
+- **强制重新索引**：ccg-plugin 仓库 `git rm --cached` + `git add` 强制所有脚本文件通过 `.gitattributes` 重新索引
+
+---
+
 ## [1.7.75] - 2026-03-10
 
 ### 🐛 修复
