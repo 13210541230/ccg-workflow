@@ -1,12 +1,16 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-10 (v1.7.77)
+**Last Updated**: 2026-03-10 (v1.7.78)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-10 (v1.7.78 - manage SubAgent 文件指向派发)
+- manage.md SubAgent 派发从 4 步简化为 3 步，子Agent 自行读取 prompt 文件
+- 消除主 Agent 读取 prompt 全文的上下文开销
 
 ### 2026-03-10 (v1.7.77 - manage 文件化 Prompt 管道)
 - assemble-prompt.sh 重构为文件读写模式（`--input-dir` / `--output`），删除环境变量传参

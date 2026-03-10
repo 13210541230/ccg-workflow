@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.78] - 2026-03-10
+
+### ♻️ 重构
+
+- **manage SubAgent 派发简化为文件指向模式**：子Agent 不再将 prompt 内容读回主 Agent 上下文，改为指示子Agent 自行读取 prompt 文件
+  - 派发流程从 4 步（Write → assemble → Read → Agent）精简为 3 步（Write → assemble → Agent）
+  - 每次派发节省一整个 prompt 文件的 token 开销
+
+---
+
 ## [1.7.77] - 2026-03-10
 
 ### ♻️ 重构

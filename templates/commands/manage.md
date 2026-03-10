@@ -149,24 +149,18 @@ Bash({
 
 **自检**：Bash 输出应包含 `已写入:` 和文件大小。若包含 `[assemble-prompt] 错误` 或输出为空，排查后重试。
 
-**第 3 步：读取 prompt 文件并 spawn 子Agent**
-
-```
-Read({ file_path: "<PLAN_DIR>/prompts/<worker-name>.prompt" })
-```
-
-然后：
+**第 3 步：spawn 子Agent（指向 prompt 文件）**
 
 ```
 Agent({
   subagent_type: "general-purpose",
-  prompt: "<上一步 Read 返回的完整文本>",
+  prompt: "Read the instruction file at <PLAN_DIR>/prompts/<worker-name>.prompt and execute all instructions within it exactly as written. Do not summarize or skip any part.",
   description: "<阶段描述>",
   run_in_background: true
 })
 ```
 
-> **硬约束**：Agent 的 prompt 参数**必须且只能**是 Read 返回的完整文本。**禁止**修改、删减、概括、重述、补充任何内容。若 Read 返回为空或报错，重新执行第 2 步，**不得**自行编写 prompt。
+> **硬约束**：Agent 的 prompt 参数**只能**是指向 prompt 文件的读取指令。**禁止**将 prompt 内容内联传递、自行编写 prompt、或在指令中附加额外要求。若 assemble-prompt.sh 输出为空或报错，重新执行第 2 步，**不得**自行编写 prompt。
 
 **第 4 步：等待后台 Agent 完成**
 
@@ -197,7 +191,7 @@ Bash({
 })
 ```
 
-第 3 步（spawn）：Read prompt 文件 → Agent spawn → 等待完成 → 执行「阶段完成后处理协议」→ 自动进入 Phase 2。
+第 3 步（spawn）：Agent spawn（指向 prompt 文件）→ 等待完成 → 执行「阶段完成后处理协议」→ 自动进入 Phase 2。
 
 #### Phase 2：规划
 
@@ -212,7 +206,7 @@ Bash({
 })
 ```
 
-第 3 步（spawn）：Read prompt 文件 → Agent spawn → 等待 → 更新 `task_plan.md` → 执行后处理协议。
+第 3 步（spawn）：Agent spawn（指向 prompt 文件）→ 等待 → 更新 `task_plan.md` → 执行后处理协议。
 
 **Hard Stop** — 展示计划，等用户确认 Y 后自动进入 Phase 3。
 
@@ -255,7 +249,7 @@ Bash({
 })
 ```
 
-第 3 步（spawn）：Read prompt 文件 → Agent spawn → 等待 → 执行「阶段完成后处理协议」→ **自动进入 Phase 5（测试）**。
+第 3 步（spawn）：Agent spawn（指向 prompt 文件）→ 等待 → 执行「阶段完成后处理协议」→ **自动进入 Phase 5（测试）**。
 
 **Teammate 模式**（Agent Teams 可用时）：创建团队 → spawn 为 team-implementer → 消息监听循环 → 清理团队。消息类型：`plan_infeasible` / `scope_extension` / `dependency_missing` / `ambiguity`。
 
@@ -299,7 +293,7 @@ Bash({
 })
 ```
 
-第 3 步（spawn）：Read prompt 文件 → Agent spawn → 等待 → 执行「阶段完成后处理协议」。
+第 3 步（spawn）：Agent spawn（指向 prompt 文件）→ 等待 → 执行「阶段完成后处理协议」。
 
 **第 2 步：评估测试结果**
 
@@ -326,7 +320,7 @@ Bash({
 })
 ```
 
-第 3 步（spawn）：Read prompt 文件 → Agent spawn → 等待 → 执行「阶段完成后处理协议」。
+第 3 步（spawn）：Agent spawn（指向 prompt 文件）→ 等待 → 执行「阶段完成后处理协议」。
 
 **Teammate 模式**：同 Phase 3，消息类型：`critical_found` / `scope_question` / `conflict_findings`。
 
@@ -378,7 +372,7 @@ AskUserQuestion({
 2. 替换 `<PLUGIN_ROOT>/shared/agent-prompts/<worker>.md` 模板中的占位符
 3. 写入 `<PLAN_DIR>/prompts/<worker>.prompt`
 
-**禁止手动编写 prompt 或修改脚本输出文件**。主Agent通过 Read 工具读取 prompt 文件后，原封不动传给 Agent 工具。
+**禁止手动编写 prompt 或修改脚本输出文件**。主Agent通过 Agent 工具指示子Agent自行读取 prompt 文件，不将 prompt 内容加载到主Agent上下文。
 
 ---
 
@@ -413,7 +407,7 @@ AskUserQuestion({
 
 子Agent 返回结果中 `result` 为空时：
 1. 用 `Read` 读取 Agent 的输出文件（路径在 spawn 时返回的 `output_file` 中，使用 Windows 绝对路径格式）
-2. 若输出文件也为空或不存在 → 用相同 prompt **重新 spawn 一个新 Agent**（不是 resume 旧的）
+2. 若输出文件也为空或不存在 → 用相同 prompt 文件路径**重新 spawn 一个新 Agent**（不是 resume 旧的）
 3. 仍失败 → 升级给用户
 
 **注意**：不要尝试 resume 已完成但输出为空的 Agent——空输出通常意味着 Agent 内部出错，resume 不会产生新结果。应该重新 spawn。
