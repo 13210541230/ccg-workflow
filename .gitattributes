@@ -1,5 +1,6 @@
-# Ensure shell scripts always use LF line endings (required for bash execution)
-*.sh text eol=lf
+# This file must stay LF to be parsed correctly
+.gitattributes text eol=lf
 
-# Ensure run-wrapper (no extension) uses LF
+# Force LF for all shell scripts and the run-wrapper entry point
+*.sh text eol=lf
 **/bin/run-wrapper text eol=lf
