@@ -1,0 +1,5 @@
+# Ensure shell scripts always use LF line endings (required for bash execution)
+*.sh text eol=lf
+
+# Ensure run-wrapper (no extension) uses LF
+**/bin/run-wrapper text eol=lf

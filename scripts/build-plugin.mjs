@@ -147,11 +147,11 @@ async function main() {
   // 11. 复制 hooks
   await copyDir(path.join(PLUGIN_TEMPLATE_DIR, 'hooks'), path.join(outDir, 'hooks'))
 
-  // 12. 复制 scripts（manage 钩子等）
+  // 12. 复制 scripts（manage 钩子等），强制 LF 行尾
   const scriptsDir = path.join(PLUGIN_TEMPLATE_DIR, 'scripts')
   try {
-    await copyDir(scriptsDir, path.join(outDir, 'scripts'))
-    log(`  scripts: manage hooks`)
+    await copyDirWithLF(scriptsDir, path.join(outDir, 'scripts'))
+    log(`  scripts: manage hooks (LF enforced)`)
   }
   catch {
     log(`  scripts: 目录不存在，跳过`)
@@ -255,9 +255,11 @@ async function copyBinaries(dir) {
 async function copyRunWrapper(dir) {
   const src = path.join(TEMPLATES_DIR, 'bin', 'run-wrapper')
   const dst = path.join(dir, 'bin', 'run-wrapper')
-  await fs.copyFile(src, dst)
+  // 强制 LF 行尾（shell 脚本在 Windows 上 checkout 可能变成 CRLF）
+  const content = (await fs.readFile(src, 'utf-8')).replace(/\r\n/g, '\n')
+  await fs.writeFile(dst, content, 'utf-8')
   await fs.chmod(dst, 0o755).catch(() => {})
-  log(`  binary: run-wrapper`)
+  log(`  binary: run-wrapper (LF enforced)`)
 }
 
 /**
@@ -327,6 +329,30 @@ function applyRules(content) {
 
 async function copyDir(src, dst) {
   await fs.cp(src, dst, { recursive: true })
+}
+
+/**
+ * 递归复制目录，对 shell 脚本强制 CRLF→LF 转换
+ * （Windows 上 git checkout 可能将 .sh 文件转为 CRLF，导致 bash 无法执行）
+ */
+async function copyDirWithLF(src, dst) {
+  await fs.mkdir(dst, { recursive: true })
+  const entries = await fs.readdir(src, { withFileTypes: true })
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name)
+    const dstPath = path.join(dst, entry.name)
+    if (entry.isDirectory()) {
+      await copyDirWithLF(srcPath, dstPath)
+    }
+    else if (entry.name.endsWith('.sh') || entry.name === 'run-wrapper') {
+      const content = (await fs.readFile(srcPath, 'utf-8')).replace(/\r\n/g, '\n')
+      await fs.writeFile(dstPath, content, 'utf-8')
+      await fs.chmod(dstPath, 0o755).catch(() => {})
+    }
+    else {
+      await fs.copyFile(srcPath, dstPath)
+    }
+  }
 }
 
 /**

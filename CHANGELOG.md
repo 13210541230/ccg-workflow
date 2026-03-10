@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.75] - 2026-03-10
+
+### 🐛 修复
+
+- **CRLF 行尾修复**：所有 `.sh` 脚本在 Windows 上因 CRLF 行尾无法执行
+  - 新增 `.gitattributes` 强制 `*.sh` 和 `run-wrapper` 使用 LF 行尾
+  - `build-plugin.mjs` 新增 `copyDirWithLF()` 构建时强制 CRLF→LF 转换
+  - 修复已有的 6 个 `.sh` 脚本行尾
+
+- **manage 源码隔离违反**：Phase 4 审查后主 Agent 直接修改代码
+  - Phase 4 后处理明确要求 spawn execute-worker 子 Agent 修复代码
+  - 新增"违反此规则等同于系统级错误"硬约束
+
+- **manage 测试阶段被跳过**：Phase 5 标记"可选"导致主 Agent 静默跳过
+  - Phase 5 从"可选"改为"必须执行"
+  - 不可测试时强制 `AskUserQuestion` 让用户决定
+
+- **assemble-prompt.sh 替换规则缺失**：添加 6 条防御性路径/变量替换规则
+  - 对齐 `build-plugin.mjs` 的 `INSTALL_VAR_RULES` 和 `PATH_RULES`
+
+### ♻️ 改进
+
+- **manage 迭代循环**：Phase 3→5→4 形成迭代循环（实施→测试→审查→修复），最多 3 轮
+  - 退出条件：测试通过且无 Critical 审查问题
+  - 止损条件：≥ 3 轮未收敛 → 升级给用户
+
+---
+
 ## [1.7.74] - 2026-03-09
 
 ### ✨ 新功能

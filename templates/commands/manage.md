@@ -193,142 +193,77 @@ spawn → 等待 → 更新 `task_plan.md` → 执行后处理协议。
 
 **Hard Stop** — 展示计划，等用户确认 Y 后自动进入 Phase 3。
 
-#### Phase 3：实施（Teammate 双向通信模式）
+#### Phase 3-5：实施 → 测试 → 审查 迭代循环
 
-> **硬约束**：主Agent禁止直接 Edit/Write 项目源代码。
+> **硬约束**：主Agent**禁止**直接 Edit/Write 项目源代码。所有代码修改（含 bug 修复）**必须**通过 spawn execute-worker 子Agent 完成。违反此规则等同于系统级错误。
 > **前置检测**：若环境变量 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` 未设为 `1`，降级为旧模式（直接用 Agent 工具 spawn，无双向通信）。
 
-**第 1 步：创建临时团队**
+Phase 3/4/5 形成**迭代循环**，而非线性流水线：
 
 ```
-Teammate({ operation: "spawnTeam", team_name: "manage-execute-<timestamp>" })
+┌─────────────────────────────────────────────────┐
+│                 迭代循环（最多 3 轮）              │
+│                                                   │
+│  Phase 3（实施）→ Phase 5（测试）→ Phase 4（审查） │
+│       ↑                                    │      │
+│       └────── 有 Critical 或测试失败 ──────┘      │
+│                                                   │
+│  退出条件：测试通过 且 无 Critical 审查问题         │
+│  止损条件：≥ 3 轮未收敛 → 升级给用户               │
+└─────────────────────────────────────────────────┘
 ```
 
-**第 2 步：组装 prompt（同现有逻辑，新增 PROMPT_TEAM_NAME）**
+**迭代状态变量**：`ITERATION = 1`，每轮 +1，记录到 `progress.md`。
 
-```
-Bash({
-  command: "PROMPT_TASK='<需求>' PROMPT_CONTEXT='<上下文>' PROMPT_DECISIONS='<决策>' PROMPT_FINDINGS='<分析结论>' PROMPT_PLAN='<确认后的计划>' PROMPT_TEAM_NAME='manage-execute-<timestamp>' bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh execute-worker --plugin-root <PLUGIN_ROOT> --plan-dir <PLAN_DIR> --session <CODEX_SESSION>",
-  description: "组装 execute-worker prompt（Teammate 模式）"
-})
-```
+---
 
-**第 3 步：spawn Worker 为团队成员**
+##### Phase 3：实施
 
-```
-Task({
-  team_name: "manage-execute-<timestamp>",
-  name: "execute-worker",
-  subagent_type: "agent-teams:team-implementer",
-  prompt: "<第 2 步 Bash 输出的完整文本>"
-})
-```
+按「Phase 1-5 子Agent 派发统一流程」执行。
 
-**第 4 步：消息监听循环**
-
-```
-WHILE execute-worker 未完成:
-  1. 检查 TaskList 获取 worker 状态
-  2. IF 收到 message (from: "execute-worker"):
-     a. 解析 REQUEST_TYPE（plan_infeasible / scope_extension / dependency_missing / ambiguity）
-     b. 主 Agent 根据类型决策：
-        - plan_infeasible → 调整计划或升级给用户
-        - scope_extension → 评估合理性，批准/拒绝
-        - dependency_missing → 提供替代方案或升级
-        - ambiguity → 选择推荐选项或指定方案
-     c. 回复: message({ recipient: "execute-worker", content: "<决策结果>" })
-     d. 记录到 progress.md 消息日志表
-  3. IF worker 状态 = completed → 跳出循环
-  4. IF 超时（30 分钟）→ shutdown_request → 升级给用户
-```
-
-**第 5 步：清理团队**
-
-```
-发送 shutdown_request → 等待 shutdown_response → Teammate cleanup
-```
-
-**第 6 步：执行「阶段完成后处理协议」→ 自动进入 Phase 4**
-
-大型任务可拆为多个并行 worker（文件范围不重叠），每个 worker 都在同一团队内 spawn，共享消息监听循环。
-
-**降级模式**（Agent Teams 不可用时）：
-
-使用现有 Agent 工具 spawn，无 PROMPT_TEAM_NAME 注入，通信协议段自动跳过：
-
-```
-Agent({
-  subagent_type: "general-purpose",
-  prompt: "<assemble-prompt.sh 输出（无 TEAM_NAME）>",
-  description: "execute-worker（降级模式）",
-  run_in_background: true
-})
-```
-
-#### Phase 4：审查（Teammate 双向通信模式）
-
-> **前置检测**：同 Phase 3，Agent Teams 不可用时降级为旧模式。
-
-**第 1 步：创建临时团队**
-
-```
-Teammate({ operation: "spawnTeam", team_name: "manage-review-<timestamp>" })
-```
-
-**第 2 步：组装 prompt**
+组装 prompt：
 
 ```
 Bash({
-  command: "PROMPT_DIFF='<git diff 输出>' PROMPT_TEAM_NAME='manage-review-<timestamp>' bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh review-worker --plugin-root <PLUGIN_ROOT> --session <CODEX_SESSION> --session-b <CODEX_B_SESSION>",
-  description: "组装 review-worker prompt（Teammate 模式）"
+  command: "PROMPT_TASK='<需求>' PROMPT_CONTEXT='<上下文>' PROMPT_DECISIONS='<决策>' PROMPT_FINDINGS='<分析结论>' PROMPT_PLAN='<确认后的计划>' [PROMPT_TEAM_NAME='<team_name>'] bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh execute-worker --plugin-root <PLUGIN_ROOT> --plan-dir <PLAN_DIR> --session <CODEX_SESSION>",
+  description: "组装 execute-worker prompt"
 })
 ```
 
-**第 3 步：spawn Worker 为团队成员**
+spawn → 等待 → 执行「阶段完成后处理协议」→ **自动进入 Phase 5（测试）**。
+
+**Teammate 模式**（Agent Teams 可用时）：创建团队 → spawn 为 team-implementer → 消息监听循环 → 清理团队。消息类型：`plan_infeasible` / `scope_extension` / `dependency_missing` / `ambiguity`。
+
+**降级模式**（Agent Teams 不可用时）：直接用 Agent 工具 spawn，无 PROMPT_TEAM_NAME。
+
+大型任务可拆为多个并行 worker（文件范围不重叠），每个 worker 在同一团队内 spawn。
+
+---
+
+##### Phase 5：测试（必须执行）
+
+> **强制规则**：测试阶段**不可跳过**。若项目确实无法测试，**必须**向用户明确说明原因（如：无测试框架、无测试命令、纯文档变更等），由用户决定是否跳过。**禁止**主Agent自行判断跳过。
+
+**第 1 步：测试可行性检查**
+
+检查项目是否具备测试条件：
+- 是否存在测试框架配置（`package.json` 中的 test 脚本、`pytest.ini`、`go test` 等）
+- 变更文件是否为可测试的代码文件（非纯文档/配置）
+
+**若不可测试**：
 
 ```
-Task({
-  team_name: "manage-review-<timestamp>",
-  name: "review-worker",
-  subagent_type: "agent-teams:team-reviewer",
-  prompt: "<第 2 步 Bash 输出的完整文本>"
+AskUserQuestion({
+  question: "当前项目不具备自动化测试条件：<具体原因>。是否跳过测试阶段直接进入审查？",
+  options: ["跳过测试，进入审查", "我来指定测试方式"]
 })
 ```
 
-**第 4 步：消息监听循环**
+用户确认跳过 → 记录到 `progress.md`（`Phase 5: skipped - <原因>`）→ 进入 Phase 4。
 
-```
-WHILE review-worker 未完成:
-  1. 检查 TaskList 获取 worker 状态
-  2. IF 收到 message (from: "review-worker"):
-     a. 解析 REQUEST_TYPE（critical_found / scope_question / conflict_findings）
-     b. 主 Agent 根据类型决策：
-        - critical_found → 决定处理方式（回退 Phase 3 / 局部修复 / 标记为已知风险）
-        - scope_question → 确认是否属于正常偏差
-        - conflict_findings → 仲裁 Codex-A 与 Codex-B 的矛盾
-     c. 回复: message({ recipient: "review-worker", content: "<决策结果>" })
-     d. 记录到 progress.md 消息日志表
-  3. IF worker 状态 = completed → 跳出循环
-  4. IF 超时（30 分钟）→ shutdown_request → 升级给用户
-```
+**若可测试**：
 
-**第 5 步：清理团队**
-
-```
-发送 shutdown_request → 等待 shutdown_response → Teammate cleanup
-```
-
-**第 6 步：后处理**
-
-按 Critical/Major/Minor/Suggestion 分级审查结果。
-
-**Critical 自动回退**：回退 Phase 3 修复 → 再审查，最多 2 轮。仍有 Critical → 升级给用户。
-
-无 Critical → 自动进入 Phase 5。
-
-**降级模式**（Agent Teams 不可用时）：同 Phase 3，使用 Agent 工具 spawn，无双向通信。
-
-#### Phase 5：测试（可选）
+组装 prompt：
 
 ```
 Bash({
@@ -337,13 +272,60 @@ Bash({
 })
 ```
 
-spawn → 等待 → 执行后处理协议。
+spawn → 等待 → 执行「阶段完成后处理协议」。
+
+**第 2 步：评估测试结果**
+
+- 全部通过 → 进入 Phase 4（审查）
+- 有失败 → 记录失败详情到 `progress.md`，**回退到 Phase 3**：
+  - 将测试失败信息注入 `PROMPT_TASK`（追加失败详情和修复要求）
+  - 重新 spawn execute-worker 修复代码（**禁止主Agent自己修复**）
+  - `ITERATION += 1`，检查止损条件
+
+---
+
+##### Phase 4：审查
+
+按「Phase 1-5 子Agent 派发统一流程」执行。
+
+组装 prompt：
+
+```
+Bash({
+  command: "PROMPT_DIFF='<git diff 输出>' [PROMPT_TEAM_NAME='<team_name>'] bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh review-worker --plugin-root <PLUGIN_ROOT> --session <CODEX_SESSION> --session-b <CODEX_B_SESSION>",
+  description: "组装 review-worker prompt"
+})
+```
+
+spawn → 等待 → 执行「阶段完成后处理协议」。
+
+**Teammate 模式**：同 Phase 3，消息类型：`critical_found` / `scope_question` / `conflict_findings`。
+
+**降级模式**：同 Phase 3。
+
+**后处理**：按 Critical/Major/Minor/Suggestion 分级审查结果。
+
+- **无 Critical** → 退出迭代循环 → 进入「完成」
+- **有 Critical** → **必须重新 spawn execute-worker 子Agent 修复**（禁止主Agent直接 Edit/Write 源码）：
+  1. 提取 Critical 问题列表，构造修复需求描述
+  2. 将 Critical 问题和修复要求注入 `PROMPT_TASK`
+  3. 重新执行 Phase 3（spawn execute-worker）→ Phase 5（测试）→ Phase 4（审查）
+  4. `ITERATION += 1`，检查止损条件
+
+**止损**：`ITERATION >= 3` 且仍有 Critical 或测试失败 → 停止迭代，升级给用户：
+
+```
+AskUserQuestion({
+  question: "经过 N 轮迭代仍未收敛：\n- Critical 问题：<列表>\n- 测试失败：<列表>\n请决定后续处理方式。",
+  options: ["继续迭代", "接受当前状态并完成", "回退所有变更"]
+})
+```
 
 ---
 
 ### 完成
 
-更新 `progress.md` 状态为 `complete`，向用户输出摘要：变更列表 + 审查结果 + 状态文件路径 + 后续建议。
+更新 `progress.md` 状态为 `complete`，向用户输出摘要：变更列表 + 测试结果 + 审查结果 + 迭代次数 + 状态文件路径 + 后续建议。
 
 ---
 
@@ -374,21 +356,24 @@ spawn → 等待 → 执行后处理协议。
 |----------|------|
 | 子Agent输出为空 | 用相同 prompt 重新 spawn 一个新 Agent（不是 resume），仍失败 → 升级给用户 |
 | 子Agent长时间未完成 | 等待自动通知，绝不 Kill；可用 Read 查看输出文件了解进度 |
-| Critical 审查问题 | 回退 Phase 3，最多 2 轮 |
+| Critical 审查问题 | spawn execute-worker 修复（**禁止主Agent直接修改代码**），最多 3 轮迭代 |
+| 测试失败 | spawn execute-worker 修复（**禁止主Agent直接修改代码**），最多 3 轮迭代 |
 | 同一 Worker ≥ 3 次失败 | 停止重试，AskUserQuestion 请用户决策 |
 | 依赖阶段失败 | 终止后续，通知用户 |
 | 执行偏差 | 记录到 findings.md + task_plan.md，继续执行 |
+| 测试不可行 | **必须**向用户说明原因并确认，禁止静默跳过 |
 
 ---
 
 ## 关键规则
 
-1. **调度不执行** — 主Agent不直接调用 Codex、不直接编辑源码
-2. **自动流转** — Phase 0→5 连续执行，仅 Phase 2 计划确认暂停
+1. **调度不执行** — 主Agent不直接调用 Codex、**不直接 Edit/Write 项目源代码**（含 bug 修复、审查问题修复、测试失败修复——全部通过 spawn execute-worker 完成）
+2. **迭代收敛** — Phase 3→5→4 形成迭代循环，测试通过且无 Critical 才退出，最多 3 轮
 3. **源码隔离** — 主Agent仅改 `.claude/plan/`，源码由 execute-worker 改
-4. **状态可追踪** — 每阶段更新 progress.md
-5. **止损机制** — 未验证不进入下一阶段
-6. **双向通信** — Phase 3/4 支持 Worker 阻塞式请求，主 Agent 监听并回复；Agent Teams 不可用时自动降级
+4. **测试不可跳过** — 不可测试时必须向用户说明原因并确认，禁止静默跳过
+5. **状态可追踪** — 每阶段更新 progress.md
+6. **止损机制** — 未验证不进入下一阶段；≥ 3 轮未收敛 → 升级给用户
+7. **双向通信** — Phase 3/4 支持 Worker 阻塞式请求，主 Agent 监听并回复；Agent Teams 不可用时自动降级
 
 ---
 

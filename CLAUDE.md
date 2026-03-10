@@ -1,12 +1,19 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-09 (v1.7.74)
+**Last Updated**: 2026-03-10 (v1.7.75)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-10 (v1.7.75 - manage 迭代循环 + CRLF 修复)
+- 修复 CRLF 行尾导致所有 .sh 脚本在 Windows 上无法执行（新增 .gitattributes + 构建时 LF 强制）
+- manage Phase 3/4/5 重构为迭代循环（实施→测试→审查→修复），最多 3 轮收敛
+- Phase 4 审查后 Critical 修复强制 spawn execute-worker（禁止主 Agent 直接编辑源码）
+- Phase 5 测试从"可选"改为"必须"，不可测试时强制向用户说明原因
+- assemble-prompt.sh 新增 6 条防御性替换规则对齐 build-plugin.mjs
 
 ### 2026-03-09 (v1.7.74 - manage 双向通信)
 - manage Phase 3/4 改造为 Agent Teams Teammate 模式，支持 Worker ↔ 主 Agent 阻塞式请求

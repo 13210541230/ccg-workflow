@@ -56,11 +56,23 @@ fi
 
 PROMPT=$(<"$TEMPLATE_PATH")
 
-# --- 替换路径占位符 ---
+# --- 替换构建变量（对齐 build-plugin.mjs 的 INSTALL_VAR_RULES）---
+# {{LITE_MODE_FLAG}} → --lite（与 build-plugin.mjs 一致）
+PROMPT="${PROMPT//\{\{LITE_MODE_FLAG\}\}/--lite }"
+
+# --- 替换路径占位符（对齐 build-plugin.mjs 的 PATH_RULES）---
+# ~/.claude/bin/codeagent-wrapper → $PLUGIN_ROOT/bin/run-wrapper
+PROMPT="${PROMPT//\~\/.claude\/bin\/codeagent-wrapper/${PLUGIN_ROOT}/bin/run-wrapper}"
+# ~/.claude/.ccg/prompts/ → $PLUGIN_ROOT/prompts/
+PROMPT="${PROMPT//\~\/.claude\/.ccg\/prompts\//${PLUGIN_ROOT}/prompts/}"
+# ~/.claude/.ccg/shared/ → $PLUGIN_ROOT/shared/
+PROMPT="${PROMPT//\~\/.claude\/.ccg\/shared\//${PLUGIN_ROOT}/shared/}"
+# ~/.claude/.ccg → 绝对路径（兼容旧引用，放在具体路径之后避免短匹配覆盖长路径）
+PROMPT="${PROMPT//\~\/.claude\/.ccg/${PLUGIN_ROOT}}"
+# ~/.claude/bin/ → $PLUGIN_ROOT/bin/
+PROMPT="${PROMPT//\~\/.claude\/bin\//${PLUGIN_ROOT}/bin/}"
 # $CLAUDE_PLUGIN_ROOT → 绝对路径（用 sed 处理 $ 转义）
 PROMPT=$(printf '%s' "$PROMPT" | sed "s|\\\$CLAUDE_PLUGIN_ROOT|${PLUGIN_ROOT}|g")
-# ~/.claude/.ccg → 绝对路径（兼容旧引用）
-PROMPT="${PROMPT//\~\/.claude\/.ccg/${PLUGIN_ROOT}}"
 
 # --- 替换内容占位符 ---
 PROMPT="${PROMPT//\{\{TASK_CONTENT\}\}/${PROMPT_TASK:-<未提供任务内容>}}"
