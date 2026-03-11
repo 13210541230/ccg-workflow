@@ -1,12 +1,17 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-11 (v1.7.80)
+**Last Updated**: 2026-03-11 (v1.7.81)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-11 (v1.7.81 - manage agent-teams default + Codex escalation rules)
+- `/ccg:manage` 在 Phase 3/4 默认优先尝试 Agent Teams，仅在 TeamCreate 不可用或失败时降级
+- `codex-collaborator` 新增“必须调用 / 禁止调用 / 默认处理”三级 Codex 判定规则
+- `analyze-worker`、`plan-worker`、`test-worker` 补充明确的 Codex 触发条件，避免简单任务滥用或复杂任务漏调
 
 ### 2026-03-11 (v1.7.79 - manage agent-teams 集成)
 - manage.md Phase 3/4 新增 agent-teams subagent 类型表 + TeamCreate/TeamDelete 生命周期

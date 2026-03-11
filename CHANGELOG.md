@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.81] - 2026-03-11
+
+### 🐛 修复
+
+- **manage 默认优先 Agent Teams**：`/ccg:manage` 的 Phase 3/4 默认先尝试 `TeamCreate()`，仅在能力不可用或创建失败时降级到 `general-purpose`
+- **子 Agent 的 Codex 协作判定收口**：为 `codex-collaborator`、`analyze-worker`、`plan-worker`、`test-worker` 补充“必须调用 / 禁止调用 / 默认处理”的明确规则，避免简单任务滥用 Codex 或复杂任务遗漏 Codex
+
 ## [1.7.80] - 2026-03-11
 
 ### ✨ 新功能
