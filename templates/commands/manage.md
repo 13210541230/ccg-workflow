@@ -175,13 +175,13 @@ Agent({
 })
 ```
 
-**subagent 类型选择**（`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 时启用 agent-teams）：
+**subagent 类型选择**（默认优先 agent-teams；仅在 TeamCreate 不可用或失败时降级）：
 
-| 阶段 | 默认 | Agent Teams 可用 |
-|------|------|-----------------|
-| Phase 1, 2, 5 | general-purpose | general-purpose |
-| Phase 3（实施） | general-purpose | agent-teams:team-implementer |
-| Phase 4（审查） | general-purpose | agent-teams:team-reviewer |
+| 阶段 | 默认首选 | 降级 |
+|------|----------|------|
+| Phase 1, 2, 5 | general-purpose | 无 |
+| Phase 3（实施） | agent-teams:team-implementer | general-purpose |
+| Phase 4（审查） | agent-teams:team-reviewer | general-purpose |
 
 > **硬约束**：Agent prompt **只能**指向 prompt 文件。禁止内联 prompt 或自行编写。assemble-prompt.sh 报错时重新执行第 2 步。
 
@@ -237,7 +237,7 @@ Bash({
 #### Phase 3-5：实施 → 测试 → 审查 迭代循环
 
 > **硬约束**：主Agent**禁止**直接 Edit/Write 项目源代码。所有代码修改**必须**通过 spawn execute-worker 完成。
-> **Agent Teams**：迭代循环开始前检测 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`，值为 `1` 时：`TeamCreate({ team_name: "manage-<task-name>", agent_type: "lead" })` → Phase 3/4 按类型表选 subagent（含 `name` 和 `team_name`）→ 迭代结束后 `TeamDelete()` 清理。
+> **Agent Teams**：迭代循环开始前**默认先尝试** `TeamCreate({ team_name: "manage-<task-name>", agent_type: "lead" })`。若创建成功，Phase 3/4 一律按类型表使用 agent-teams subagent（含 `name` 和 `team_name`）；若 TeamCreate 因能力不可用、环境未启用或调用失败而报错，记录到 `progress.md` 后再降级到 `general-purpose`。迭代结束后若团队已创建，必须 `TeamDelete()` 清理。
 
 Phase 3/4/5 形成**迭代循环**，而非线性流水线：
 
