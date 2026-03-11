@@ -2,7 +2,7 @@
 
 # Templates (命令模板 + 专家提示词 + 输出风格)
 
-**Last Updated**: 2026-02-25 (v1.7.61)
+**Last Updated**: 2026-03-11 (v1.7.80)
 
 ---
 
@@ -11,6 +11,11 @@
 ### 2026-03-09 (codex-operator 子Agent)
 - 新增 `codex-operator.md` 通用 Codex 代理子Agent（迭代编排，最多 5 轮）
 - 统计更新：4 -> 5 子智能体
+
+### 2026-03-11 (wrapper-free runtime + runtime docs sync)
+- 新增 `codex.md` 运行时直连命令模板
+- 新增 `codex-collaborator.md` 子Agent，子智能体数量更新为 6
+- 统计更新：27 -> 28 命令模板，5 -> 6 子智能体
 
 ### 2026-02-25 (插件集成)
 - 新增 `manage.md` 主Agent调度命令
@@ -21,7 +26,7 @@
 
 ### 2026-02-25
 - 初次由架构扫描器生成此模块文档
-- 统计：27 命令模板 + 4 子智能体 + 19 专家提示词 + 5 输出风格 + 1 shell 脚本
+- 统计：28 命令模板 + 6 子智能体 + 19 专家提示词 + 5 输出风格 + Skills/运行时脚本
 
 ---
 
@@ -35,18 +40,20 @@
 
 ```
 templates/
-+-- commands/              # 27 个斜杠命令模板 -> ~/.claude/commands/ccg/
-|   +-- agents/            # 5 个子智能体 -> ~/.claude/agents/ccg/
++-- commands/              # 28 个斜杠命令模板 -> ~/.claude/commands/ccg/
+|   +-- agents/            # 6 个子智能体 -> ~/.claude/agents/ccg/
 |   |   +-- planner.md
 |   |   +-- ui-ux-designer.md
 |   |   +-- init-architect.md
 |   |   +-- codex-operator.md
+|   |   +-- codex-collaborator.md
 |   +-- get-current-datetime.md
 |   +-- workflow.md         # 完整 6 阶段工作流
 |   +-- plan.md             # 多模型协作规划
 |   +-- execute.md          # 多模型协作执行
 |   +-- frontend.md         # 前端专项
 |   +-- backend.md          # 后端专项
+|   +-- codex.md            # 运行时直连后端
 |   +-- feat.md             # 智能功能开发
 |   +-- analyze.md          # 技术分析
 |   +-- debug.md            # 问题诊断
@@ -110,6 +117,9 @@ templates/
 
 ### 开发工作流（12 个）
 workflow / plan / execute / frontend / backend / feat / analyze / debug / optimize / test / review / manage
+
+### 运行时直连工具（1 个）
+codex
 
 ### Prompt 工具（1 个）
 enhance

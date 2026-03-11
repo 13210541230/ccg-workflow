@@ -115,7 +115,7 @@
 
 ## 项目愿景
 
-**CCG (Claude + Codex)** 是一个多模型协作开发系统，以 Claude Code 为编排中心，通过 Codex 双视角（逻辑 + 架构）实现多模型协作的最佳开发体验。运行时默认走 Codex，同时保留 Gemini 作为可切换后端链路。以 Claude Code Plugin 形式分发，用户通过 `/install-plugin` 一键安装 27 个斜杠命令 + 19 个专家提示词，即可使用 `/ccg:xxx` 命令。
+**CCG (Claude + Codex)** 是一个多模型协作开发系统，以 Claude Code 为编排中心，通过 Codex 双视角（逻辑 + 架构）实现多模型协作的最佳开发体验。运行时默认走 Codex，同时保留 Gemini 作为可切换后端链路。以 Claude Code Plugin 形式分发，用户通过 `/install-plugin` 一键安装 28 个斜杠命令 + 19 个专家提示词，即可使用 `/ccg:xxx` 命令。
 
 ---
 
@@ -126,8 +126,8 @@ graph TD
     User["用户"] --> Plugin["/install-plugin"]
     Plugin --> Init["一键安装"]
 
-    Init --> Commands["commands/<br/>27 个命令"]
-    Init --> Agents["agents/<br/>5 个子智能体"]
+    Init --> Commands["commands/<br/>28 个命令"]
+    Init --> Agents["agents/<br/>6 个子智能体"]
     Init --> Prompts["prompts/<br/>19 个专家提示词"]
     Init --> Runtime["scripts + skills<br/>wrapper-free runtime"]
 
@@ -163,7 +163,7 @@ graph TD
     B --> B3["i18n/<br/>国际化"]
     B --> B4["types/<br/>类型定义"]
 
-    D --> D1["commands/<br/>26 模板 + 5 agents"]
+    D --> D1["commands/<br/>28 模板 + 6 agents"]
     D --> D2["prompts/<br/>19 专家提示词"]
     D --> D3["output-styles/<br/>5 输出风格"]
     D --> D4["skills/<br/>Skill + script"]
@@ -230,7 +230,7 @@ python ~/.claude/.ccg/scripts/codex_bridge.py --help
 
 ## 对外接口
 
-### Slash Commands 接口（27 个命令）
+### Slash Commands 接口（28 个命令）
 
 **开发工作流（12 个）**:
 
@@ -248,6 +248,12 @@ python ~/.claude/.ccg/scripts/codex_bridge.py --help
 | `/ccg:test` | 测试生成 | 智能路由 |
 | `/ccg:review` | 代码审查（自动 git diff） | Codex + Codex |
 | `/ccg:manage` | 主Agent调度（自动化编排） | sequential-thinking + comprehensive-review |
+
+**运行时直连工具（1 个）**:
+
+| 命令 | 用途 | 模型 |
+|------|------|------|
+| `/ccg:codex` | 直接通过 bridge/Skill 调用外部后端 | Codex / Gemini / Claude |
 
 **Prompt 工具（1 个）**:
 
@@ -301,7 +307,7 @@ v1.7.0 起，以下配置不再支持自定义：
 | 前端模型 | Codex | 双 Codex 架构 |
 | 后端模型 | Codex（默认），可通过 `CCG_BACKEND=gemini` 或 `CCG_BACKEND=claude` 切换 | 默认保持 Codex，Gemini 链路保留 |
 | 协作模式 | smart | 最佳实践 |
-| 命令数量 | 27 个 | 全部安装 |
+| 命令数量 | 28 个 | 全部安装 |
 
 ---
 
@@ -379,8 +385,8 @@ src/
 
 ```
 templates/
-+-- commands/                  # 26 个斜杠命令
-+-- commands/agents/           # 5 个子智能体
++-- commands/                  # 28 个斜杠命令
++-- commands/agents/           # 6 个子智能体
 +-- prompts/codex/             # 6 个 Codex 提示词
 +-- prompts/gemini/            # 7 个 Gemini 提示词
 +-- prompts/claude/            # 6 个 Claude 提示词

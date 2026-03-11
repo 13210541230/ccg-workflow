@@ -37,6 +37,7 @@
 | `/ccg:feat` | 新功能开发 |
 | `/ccg:frontend` | 前端任务 |
 | `/ccg:backend` | 后端任务 (Codex) |
+| `/ccg:codex` | 直接调用运行时后端 |
 | `/ccg:analyze` | 技术分析 |
 | `/ccg:debug` | 问题诊断 |
 | `/ccg:optimize` | 性能优化 |
