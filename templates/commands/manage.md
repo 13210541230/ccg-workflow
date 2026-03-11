@@ -12,7 +12,7 @@ $ARGUMENTS
 
 - **语言协议**：与工具/模型交互用**英语**，与用户交互用**中文**
 - **代码主权**：外部模型对文件系统**零写入权限**，所有修改由 Claude 执行
-- **调度模式**：主Agent只做编排和监控，通过 Task 工具 spawn 轻量子Agent执行具体工作
+- **调度模式**：主Agent只做编排和监控，通过 Agent 工具 spawn 轻量子Agent执行具体工作
 - **自动流转**：除 Phase 2 计划确认外，各阶段完成后**立即自动进入下一阶段**，无需用户确认
 - **源码隔离**：主Agent**禁止**直接 Edit/Write 项目源代码。仅允许修改 `.claude/plan/` 下的状态文件。所有源码修改必须通过 execute-worker 子Agent 完成
 - **止损机制**：当前阶段输出通过验证前，不进入下一阶段
@@ -26,7 +26,7 @@ $ARGUMENTS
 你是**调度协调者**，职责：
 - 读取/创建状态文件（`.claude/plan/<task-name>/`）
 - 用 `mcp__sequential-thinking__sequentialthinking` 分解任务
-- 通过 Task 工具 spawn 子Agent（**不自己调用 Codex**）
+- 通过 Agent 工具 spawn 子Agent（**不自己调用 Codex**）
 - 监控子Agent产出，更新状态文件
 - 异常时决策：重试/回退/升级给用户
 
@@ -133,7 +133,7 @@ Glob({ pattern: ".claude/plan/*/progress.md" })
 | `plan.md` | 确认后的实施计划 | Phase 3（Phase 2 确认后写入） |
 | `diff.txt` | `git diff` 输出 | Phase 4（每次审查前用 Bash 获取并 Write） |
 | `changed-files.txt` | 变更文件列表 | Phase 5（每次测试前用 Bash 获取并 Write） |
-| `team-name.txt` | 团队名称 | Phase 3, 4（Teammate 模式时写入） |
+| `team-name.txt` | 团队名称 | Phase 3, 4（Agent Teams 可用时写入） |
 
 - 已在前序阶段写入且未变化的文件**无需重复写入**
 - 需要更新的文件直接用 Write 覆写
@@ -153,14 +153,24 @@ Bash({
 
 ```
 Agent({
-  subagent_type: "general-purpose",
+  subagent_type: "<见类型表>",
+  name: "<worker-name>",  // agent-teams 类型时必须传入，用于 SendMessage 寻址
+  team_name: "<TEAM_NAME>",  // 仅 Phase 3/4 agent-teams 类型时传入，其余省略
   prompt: "Read the instruction file at <PLAN_DIR>/prompts/<worker-name>.prompt and execute all instructions within it exactly as written. Do not summarize or skip any part.",
   description: "<阶段描述>",
   run_in_background: true
 })
 ```
 
-> **硬约束**：Agent 的 prompt 参数**只能**是指向 prompt 文件的读取指令。**禁止**将 prompt 内容内联传递、自行编写 prompt、或在指令中附加额外要求。若 assemble-prompt.sh 输出为空或报错，重新执行第 2 步，**不得**自行编写 prompt。
+**subagent 类型选择**（`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 时启用 agent-teams）：
+
+| 阶段 | 默认 | Agent Teams 可用 |
+|------|------|-----------------|
+| Phase 1, 2, 5 | general-purpose | general-purpose |
+| Phase 3（实施） | general-purpose | agent-teams:team-implementer |
+| Phase 4（审查） | general-purpose | agent-teams:team-reviewer |
+
+> **硬约束**：Agent prompt **只能**指向 prompt 文件。禁止内联 prompt 或自行编写。assemble-prompt.sh 报错时重新执行第 2 步。
 
 **第 4 步：等待后台 Agent 完成**
 
@@ -169,7 +179,8 @@ Agent({
 - **禁止**主动轮询、resume、或 Read 输出文件来检查进度
 - **禁止**在 Agent 仍在运行时尝试 resume（会报 "Cannot resume: still running" 错误）
 - 等待期间可以做**不冲突的工作**（如更新状态文件、准备下一阶段的 input 文件），或向用户简要说明正在等待
-- 收到通知后，从 Agent 返回的 `result` 中提取子Agent产出，进入「阶段完成后处理协议」
+- **Agent Teams 消息处理**：Phase 3/4 worker 可能发送阻塞式消息（`recipient: "team-lead"`）。收到后用 `SendMessage({ type: "message", recipient: "<worker-name>", content: "<决策>", summary: "<摘要>" })` 回复
+- 收到**完成通知**后，从 Agent 返回的 `result` 中提取子Agent产出，进入「阶段完成后处理协议」
 
 **关于 Agent resume 的约束**：
 - `resume` 只能用于**已完成**的 Agent，且**必须提供 `prompt` 参数**
@@ -212,8 +223,8 @@ Bash({
 
 #### Phase 3-5：实施 → 测试 → 审查 迭代循环
 
-> **硬约束**：主Agent**禁止**直接 Edit/Write 项目源代码。所有代码修改（含 bug 修复）**必须**通过 spawn execute-worker 子Agent 完成。违反此规则等同于系统级错误。
-> **前置检测**：若环境变量 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` 未设为 `1`，降级为旧模式（直接用 Agent 工具 spawn，无双向通信）。
+> **硬约束**：主Agent**禁止**直接 Edit/Write 项目源代码。所有代码修改**必须**通过 spawn execute-worker 完成。
+> **Agent Teams**：迭代循环开始前检测 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`，值为 `1` 时：`TeamCreate({ team_name: "manage-<task-name>", agent_type: "lead" })` → Phase 3/4 按类型表选 subagent（含 `name` 和 `team_name`）→ 迭代结束后 `TeamDelete()` 清理。
 
 Phase 3/4/5 形成**迭代循环**，而非线性流水线：
 
@@ -238,7 +249,7 @@ Phase 3/4/5 形成**迭代循环**，而非线性流水线：
 
 按「Phase 1-5 子Agent 派发统一流程」执行。
 
-第 1 步（写入 input）：将确认后的计划写入 `inputs/plan.md`。Teammate 模式时写入 `inputs/team-name.txt`。
+第 1 步（写入 input）：将确认后的计划写入 `inputs/plan.md`。Agent Teams 可用时写入 `inputs/team-name.txt`。
 
 第 2 步（组装 prompt）：
 
@@ -249,13 +260,7 @@ Bash({
 })
 ```
 
-第 3 步（spawn）：Agent spawn（指向 prompt 文件）→ 等待 → 执行「阶段完成后处理协议」→ **自动进入 Phase 5（测试）**。
-
-**Teammate 模式**（Agent Teams 可用时）：创建团队 → spawn 为 team-implementer → 消息监听循环 → 清理团队。消息类型：`plan_infeasible` / `scope_extension` / `dependency_missing` / `ambiguity`。
-
-**降级模式**（Agent Teams 不可用时）：直接用 Agent 工具 spawn，无 PROMPT_TEAM_NAME。
-
-大型任务可拆为多个并行 worker（文件范围不重叠），每个 worker 在同一团队内 spawn。
+第 3 步（spawn）：按类型表选择 subagent 类型 → 等待 → 执行「阶段完成后处理协议」→ **自动进入 Phase 5（测试）**。大型任务可拆为多个并行 worker（文件范围不重叠）。
 
 ---
 
@@ -309,7 +314,7 @@ Bash({
 
 按「Phase 1-5 子Agent 派发统一流程」执行。
 
-第 1 步（写入 input）：将 `git diff` 输出写入 `inputs/diff.txt`。Teammate 模式时写入 `inputs/team-name.txt`。
+第 1 步（写入 input）：将 `git diff` 输出写入 `inputs/diff.txt`。Agent Teams 可用时写入 `inputs/team-name.txt`。
 
 第 2 步（组装 prompt）：
 
@@ -320,11 +325,7 @@ Bash({
 })
 ```
 
-第 3 步（spawn）：Agent spawn（指向 prompt 文件）→ 等待 → 执行「阶段完成后处理协议」。
-
-**Teammate 模式**：同 Phase 3，消息类型：`critical_found` / `scope_question` / `conflict_findings`。
-
-**降级模式**：同 Phase 3。
+第 3 步（spawn）：按类型表选择 subagent 类型 → 等待 → 执行「阶段完成后处理协议」。
 
 **后处理**：按 Critical/Major/Minor/Suggestion 分级审查结果。
 
@@ -348,7 +349,9 @@ AskUserQuestion({
 
 ### 完成
 
-更新 `progress.md` 状态为 `complete`，向用户输出摘要：变更列表 + 测试结果 + 审查结果 + 迭代次数 + 状态文件路径 + 后续建议。
+1. 若 Agent Teams 已启用 → `TeamDelete()` 清理团队资源
+2. 更新 `progress.md` 状态为 `complete`
+3. 向用户输出摘要：变更列表 + 测试结果 + 审查结果 + 迭代次数 + 状态文件路径 + 后续建议
 
 ---
 
@@ -399,7 +402,7 @@ AskUserQuestion({
 4. **测试不可跳过** — 不可测试时必须向用户说明原因并确认，禁止静默跳过
 5. **状态可追踪** — 每阶段更新 progress.md
 6. **止损机制** — 未验证不进入下一阶段；≥ 3 轮未收敛 → 升级给用户
-7. **双向通信** — Phase 3/4 支持 Worker 阻塞式请求，主 Agent 监听并回复；Agent Teams 不可用时自动降级
+7. **双向通信** — Phase 3/4 使用 agent-teams subagent 时支持 Worker 阻塞式请求（协议内置于 worker prompt）
 
 ---
 

@@ -12,16 +12,18 @@
 ## 实施计划
 {{PLAN_CONTENT}}
 
-## 自适应策略（必须首先评估）
+## 模型选择（首先评估）
 
-| 条件 | 模式 | 说明 |
-|------|------|------|
-| 涉及 ≤ 2 个文件 且 变更逻辑明确 | **Claude 直接实施** | 跳过 Codex，直接用 Edit/Write 实施 |
-| 涉及 > 2 个文件 或 需要算法原型 或 变更逻辑复杂 | **Codex 原型 + Claude 重构** | 先获取 Codex Diff 原型，再重构应用 |
+**Codex 擅长**：跨文件重构、算法/状态机原型、复杂依赖链变更（输出 Unified Diff Patch，不直接改文件）
+**Claude 擅长**：精确局部编辑、项目规范适配、即时验证（有 Read/Edit/Write 工具直接操作）
 
-**Claude 直接实施模式**：直接用 Read → Edit/Write 实施变更，跳过步骤 1，从步骤 2 的"重构与应用"开始。
+| 选 Claude 直接实施 | 选 Codex 原型 + Claude 重构 |
+|-------------------|---------------------------|
+| ≤ 2 个文件，局部修改、配置调整 | > 2 个文件，跨模块联动 |
+| 逻辑明确，无算法设计 | 算法设计、并发、复杂状态管理 |
+| 无跨模块依赖 | 多模块协调变更、接口重构 |
 
-**Codex 原型模式**：按以下全部步骤执行。
+**任一右列条件成立 → Codex 原型模式**（按全部步骤执行）。否则 Claude 直接实施（跳过步骤 1，从步骤 2 开始）。
 
 ## 调用规范
 
@@ -135,7 +137,7 @@ TaskOutput({ task_id: "<codex_task_id>", block: true, timeout: 600000 })
 
 ```
 message({
-  recipient: "lead",
+  recipient: "team-lead",
   content: "REQUEST_TYPE: <场景类型>\nDESCRIPTION: <问题的具体描述>\nOPTIONS: <你建议的 1-3 个解决选项>\nRECOMMENDATION: <你推荐的选项及理由>",
   summary: "<一句话摘要>"
 })

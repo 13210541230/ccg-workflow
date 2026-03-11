@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.79] - 2026-03-11
+
+### ✨ 新功能
+
+- **manage agent-teams 集成**：Phase 3/4 支持 `agent-teams:team-implementer` / `team-reviewer` subagent 类型
+  - 新增 subagent 类型选择表，按 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` 环境变量自动切换
+  - 新增 TeamCreate/TeamDelete 团队生命周期管理（迭代循环前创建、完成后清理）
+  - Agent 调用模板新增 `name` + `team_name` 参数，支持 SendMessage 双向寻址
+  - 第 4 步新增 agent-teams 消息处理指令（worker 阻塞式请求 → lead 回复）
+
+### 🐛 修复
+
+- **worker recipient 路由修复**：`recipient: "lead"` → `recipient: "team-lead"`（匹配 TeamCreate 返回的 lead 名称）
+- **工具术语修正**：核心协议和角色描述中 "Task 工具" → "Agent 工具"
+
+### ♻️ 重构
+
+- **execute-worker 模型选择重写**：从机械文件数量判断改为能力导向（Codex 擅长跨文件重构/算法原型，Claude 擅长精确编辑/即时验证）+ 多维度判断表
+- **manage.md 精简**：删除冗余的 Teammate/降级模式段落、前置检测段落，净减 ~20 行
+
+---
+
 ## [1.7.78] - 2026-03-10
 
 ### ♻️ 重构

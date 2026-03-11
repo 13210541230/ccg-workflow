@@ -1,12 +1,18 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-10 (v1.7.78)
+**Last Updated**: 2026-03-11 (v1.7.79)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-11 (v1.7.79 - manage agent-teams 集成)
+- manage.md Phase 3/4 新增 agent-teams subagent 类型表 + TeamCreate/TeamDelete 生命周期
+- Agent 调用模板新增 name + team_name 参数，第 4 步新增消息处理指令
+- execute-worker 模型选择从文件数量判断重写为 Codex/Claude 能力导向多维判断
+- worker prompt recipient 修复：`"lead"` → `"team-lead"`（经实际 teammate 测试验证）
 
 ### 2026-03-10 (v1.7.78 - manage SubAgent 文件指向派发)
 - manage.md SubAgent 派发从 4 步简化为 3 步，子Agent 自行读取 prompt 文件

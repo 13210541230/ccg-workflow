@@ -148,7 +148,7 @@ TaskOutput({ task_id: "<codex_b_task_id>", block: true, timeout: 600000 })
 
 ```
 message({
-  recipient: "lead",
+  recipient: "team-lead",
   content: "REQUEST_TYPE: <场景类型>\nDESCRIPTION: <问题的具体描述>\nFINDINGS: <相关审查发现的详细内容>\nRECOMMENDATION: <你的建议处理方式>",
   summary: "<一句话摘要>"
 })
