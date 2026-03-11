@@ -7,7 +7,7 @@
 
 </div>
 
-以 Claude Code 为编排中心，协调 Codex 进行多模型协作开发。后端任务路由至 Codex，Claude 负责编排决策和代码审核。
+以 Claude Code 为编排中心，协调 Codex / Gemini 进行多模型协作开发。当前默认后端仍为 Codex，Gemini 链路保留为可切换执行路径。
 
 ## 安装
 
@@ -19,7 +19,7 @@
 
 **要求**：Claude Code CLI、Node.js 20+
 
-**可选**：Codex CLI（后端模型）
+**可选**：Codex CLI、Gemini CLI（按需切换后端时使用）
 
 ## 更新
 
@@ -102,10 +102,11 @@
 ~/.claude/plugins/cache/ccg-plugin/ccg/<version>/
 ├── commands/          # 斜杠命令
 ├── agents/            # 子智能体
-├── bin/               # codeagent-wrapper + run-wrapper
 ├── prompts/           # 专家提示词
 ├── output-styles/     # 输出风格
 ├── hooks/             # 自动化钩子
+├── scripts/           # codex_bridge.py 等运行时脚本
+├── skills/            # CCG 安装的运行时 Skills
 └── .claude-plugin/    # 插件元数据
 ```
 
@@ -113,9 +114,7 @@
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `CCG_BACKEND` | 后端模型切换 (`codex` / `claude`) | `codex` |
-| `CODEAGENT_POST_MESSAGE_DELAY` | Codex 完成后等待时间（秒） | 5 |
-| `CODEX_TIMEOUT` | codeagent-wrapper 执行超时（秒） | 7200 |
+| `CCG_BACKEND` | 后端模型切换 (`codex` / `gemini` / `claude`) | `codex` |
 | `BASH_DEFAULT_TIMEOUT_MS` | Claude Code Bash 默认超时（毫秒） | 120000 |
 | `BASH_MAX_TIMEOUT_MS` | Claude Code Bash 最大超时（毫秒） | 600000 |
 
@@ -124,8 +123,6 @@
 ```json
 {
   "env": {
-    "CODEAGENT_POST_MESSAGE_DELAY": "1",
-    "CODEX_TIMEOUT": "7200",
     "BASH_DEFAULT_TIMEOUT_MS": "600000",
     "BASH_MAX_TIMEOUT_MS": "3600000"
   }
@@ -134,11 +131,9 @@
 
 ## 已知问题
 
-**Codex CLI 0.80.0 进程不退出**
+**空输出恢复**
 
-`--json` 模式下 Codex 完成输出后进程不会自动退出。
-
-解决：设置 `CODEAGENT_POST_MESSAGE_DELAY=1`
+优先使用内置 `codex-runtime` Skill 或 `codex_bridge.py` 的持久化输出文件，而不是依赖临时 TaskOutput 文件。该 Skill 当前已支持 `codex` / `gemini` / `claude`，但默认仍走 `codex`。
 
 ## 架构
 
@@ -159,7 +154,6 @@ Codex   Codex-B
 
 ## 致谢
 
-- [cexll/myclaude](https://github.com/cexll/myclaude) - codeagent-wrapper
 - [UfoMiao/zcf](https://github.com/UfoMiao/zcf) - Git 工具
 - [GudaStudio/skills](https://github.com/GuDaStudio/skills) - 路由设计
 
@@ -173,4 +167,4 @@ MIT
 
 ---
 
-v1.7.74 | [Issues](https://github.com/fengshao1227/ccg-workflow/issues)
+v1.7.80 | [Issues](https://github.com/fengshao1227/ccg-workflow/issues)

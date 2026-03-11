@@ -43,20 +43,21 @@ Read({ file_path: "{{PLAN_DIR}}/decisions.md" })
 
 **若即将操作的文件不在 task_plan.md 的关键文件列表中** -> 在过程日志的「计划偏差」中记录后再继续。
 
-使用 codeagent-wrapper 调用 Codex 获取 Unified Diff Patch 原型，然后由 Claude 重构为生产级代码。
+**步骤 0.1：解析 codex_bridge.py 路径**
+
+Bash({
+  command: "P=\"$HOME/.claude/plugins/cache/ccg-plugin/ccg\"; R=$(ls -1d \"$P\"/*/ 2>/dev/null | sort -V | tail -1 | sed 's|/$||'); B=\"$R/scripts/codex_bridge.py\"; echo \"PLUGIN_ROOT=$R\"; [ -f \"$B\" ] && echo \"BRIDGE=$B OK\" || echo 'BRIDGE MISSING'",
+  description: "解析 codex_bridge.py 路径"
+})
+
+将输出中的 `PLUGIN_ROOT` 和 `BRIDGE` 值记为 `<PLUGIN_ROOT>` 和 `<BRIDGE>`，后续步骤引用。
+
+使用 codex_bridge.py 调用 Codex 获取 Unified Diff Patch 原型，然后由 Claude 重构为生产级代码。
 
 **步骤 1：获取原型**
 
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} resume {{CODEX_SESSION}} - \"$(pwd)\" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/architect.md
-<TASK>
-需求：{{TASK_CONTENT}}
-上下文：{{PLAN_CONTENT}}
-目标文件：<从计划中提取的关键文件列表>
-</TASK>
-OUTPUT: Unified Diff Patch ONLY. Strictly prohibit any actual modifications.
-EOF",
+  command: "python \"<BRIDGE>\" --cd \"$(pwd)\" --role \"<PLUGIN_ROOT>/prompts/codex/architect.md\" --sandbox read-only{{CODEX_SESSION_ARG}} --PROMPT '需求：{{TASK_CONTENT}}\n上下文：{{PLAN_CONTENT}}\n目标文件：<从计划中提取的关键文件列表>\nOUTPUT: Unified Diff Patch ONLY. Strictly prohibit any actual modifications.'",
   run_in_background: true,
   timeout: 3600000,
   description: "Codex 原型获取"

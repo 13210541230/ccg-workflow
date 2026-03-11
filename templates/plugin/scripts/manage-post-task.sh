@@ -1,5 +1,5 @@
 #!/bin/bash
-# CCG Manage: PostToolUse hook for Task tool
+# CCG Manage: PostToolUse hook for Task / Agent tools
 # Reminds Claude to execute the post-phase protocol after subagent returns
 # Conditional: only fires when an active manage session exists
 # Always exits 0 — stdout feeds into Claude's context

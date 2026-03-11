@@ -58,15 +58,21 @@ description: '初始化 OpenSpec (OPSX) 环境 + 验证多模型 MCP 工具'
    - Report any errors with remediation steps.
 
 4. **Validate Multi-Model MCP Tools**
-   - Check `codeagent-wrapper` availability: `~/.claude/bin/codeagent-wrapper --version`
    - **工作目录**：`{{WORKDIR}}` 替换为目标工作目录的绝对路径。如果用户通过 `/add-dir` 添加了多个工作区，先确定任务相关的工作区。
+   - Check `codex_bridge.py` availability:
+     ```
+     Bash({
+       command: "P=\"$HOME/.claude/plugins/cache/ccg-plugin/ccg\"; R=$(ls -1d \"$P\"/*/ 2>/dev/null | sort -V | tail -1 | sed 's|/$||'); B=\"$R/scripts/codex_bridge.py\"; echo \"PLUGIN_ROOT=$R\"; python --version 2>&1; [ -f \"$B\" ] && echo \"BRIDGE=$B\" && echo 'OK' || echo 'BRIDGE MISSING'",
+       description: "解析 codex_bridge.py 路径"
+     })
+     ```
    - Test Codex backend:
      ```bash
-     ~/.claude/bin/codeagent-wrapper --backend ${CCG_BACKEND:-codex} - "{{WORKDIR}}" <<< "echo test"
+     python "<BRIDGE>" --cd "{{WORKDIR}}" --sandbox read-only --PROMPT 'echo test'
      ```
    - Test Codex backend (second instance):
      ```bash
-     ~/.claude/bin/codeagent-wrapper --backend ${CCG_BACKEND:-codex} - "{{WORKDIR}}" <<< "echo test"
+     python "<BRIDGE>" --cd "{{WORKDIR}}" --sandbox read-only --PROMPT 'echo test'
      ```
    - For each unavailable tool, display warning with installation instructions.
 
@@ -87,7 +93,8 @@ description: '初始化 OpenSpec (OPSX) 环境 + 验证多模型 MCP 工具'
    OpenSpec (OPSX) CLI       ✓/✗
    Project initialized       ✓/✗
    OPSX Skills               ✓/✗
-   codeagent-wrapper         ✓/✗
+   codex_bridge.py           ✓/✗
+   Python                    ✓/✗
    Codex backend             ✓/✗
    Codex backend (2nd)       ✓/✗
    fast-context MCP          ✓/✗ (optional)
@@ -105,6 +112,6 @@ description: '初始化 OpenSpec (OPSX) 环境 + 验证多模型 MCP 工具'
 - OpenSpec (OPSX) CLI: `npx @fission-ai/openspec --help`
 - Profile Management: `openspec config profile`
 - CCG Workflow: `npx ccg-workflow`
-- Codex MCP: Bundled with codeagent-wrapper
+- Codex MCP: Bundled with codex_bridge.py
 - Node.js >= 18.x required for OpenSpec
 <!-- CCG:SPEC:INIT:END -->

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.80] - 2026-03-11
+
+### ✨ 新功能
+
+- **Skill 化运行时替代 wrapper**：新增 `templates/skills/codex-runtime/`，用 Skill + Python runner 承接原 `codeagent-wrapper` 的运行时职责
+  - 支持持久化 JSON 输出、长 prompt 的 `--prompt-file`、`SESSION_ID` 复用和空输出恢复
+  - 安装器和插件构建链路同步纳入 `templates/skills/`
+
+### 🐛 修复
+
+- **恢复 Gemini 后端链路**：`codex_bridge.py` 从 Codex-only 恢复为多后端 bridge，支持 `codex` / `gemini` / `claude`
+  - Gemini CLI 调用协议恢复为 `gemini -o stream-json -y [-m model] [-r session] -p <prompt>`
+  - 统一桥接层的 `SESSION_ID` / 输出消息提取逻辑，避免配置层保留 `gemini` 但运行时无法调用
+- **多后端调用规范收口**：共享规范和运行时 Skill 改为按 `${CCG_BACKEND:-codex}` 解析 prompts 路径，默认仍走 Codex
+
+### ♻️ 重构
+
+- **移除 codeagent-wrapper 运行时依赖**：删除 `codeagent-wrapper/`、预编译二进制和 `templates/bin/`，主链统一切到 `codex_bridge.py + Skill`
+- **安装与权限白名单对齐新主链**：初始化流程和菜单白名单改为 bridge / skill runner / prompt assembler
+
 ## [1.7.79] - 2026-03-11
 
 ### ✨ 新功能

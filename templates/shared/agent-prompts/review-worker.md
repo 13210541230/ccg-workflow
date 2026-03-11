@@ -19,7 +19,16 @@
 
 ## 调用规范（Codex 模式）
 
-使用 codeagent-wrapper 并行调用 Codex-A 和 Codex-B，双视角覆盖 5 个审查维度：
+**步骤 0：解析 codex_bridge.py 路径**
+
+Bash({
+  command: "P=\"$HOME/.claude/plugins/cache/ccg-plugin/ccg\"; R=$(ls -1d \"$P\"/*/ 2>/dev/null | sort -V | tail -1 | sed 's|/$||'); B=\"$R/scripts/codex_bridge.py\"; echo \"PLUGIN_ROOT=$R\"; [ -f \"$B\" ] && echo \"BRIDGE=$B OK\" || echo 'BRIDGE MISSING'",
+  description: "解析 codex_bridge.py 路径"
+})
+
+将输出中的 `PLUGIN_ROOT` 和 `BRIDGE` 值记为 `<PLUGIN_ROOT>` 和 `<BRIDGE>`，后续步骤引用。
+
+使用 codex_bridge.py 并行调用 Codex-A 和 Codex-B，双视角覆盖 5 个审查维度：
 
 | 维度 | Codex-A | Codex-B |
 |------|---------|---------|
@@ -33,18 +42,7 @@
 
 Codex-A（安全 + 性能 + 逻辑正确性）:
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} resume {{CODEX_SESSION}} - \"$(pwd)\" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/reviewer.md
-<TASK>
-审查以下代码变更：
-{{DIFF_CONTENT}}
-你负责 3 个维度的审查，每个维度独立输出：
-1. **安全性**：注入风险（SQL/XSS/命令注入）、敏感信息泄露、权限校验缺失、OWASP Top 10
-2. **性能**：算法复杂度、资源泄漏（内存/文件句柄/连接）、并发竞态、不必要的开销
-3. **逻辑正确性**：边界条件、错误处理遗漏、数据流断裂、空值/异常路径
-</TASK>
-OUTPUT: 按 Critical/Major/Minor/Suggestion 分类列出问题，每条标注所属维度 [安全/性能/逻辑]，JSON 格式
-EOF",
+  command: "python \"<BRIDGE>\" --cd \"$(pwd)\" --role \"<PLUGIN_ROOT>/prompts/codex/reviewer.md\" --sandbox read-only{{CODEX_SESSION_ARG}} --PROMPT '审查以下代码变更：\n{{DIFF_CONTENT}}\n你负责 3 个维度的审查，每个维度独立输出：\n1. **安全性**：注入风险（SQL/XSS/命令注入）、敏感信息泄露、权限校验缺失、OWASP Top 10\n2. **性能**：算法复杂度、资源泄漏（内存/文件句柄/连接）、并发竞态、不必要的开销\n3. **逻辑正确性**：边界条件、错误处理遗漏、数据流断裂、空值/异常路径\nOUTPUT: 按 Critical/Major/Minor/Suggestion 分类列出问题，每条标注所属维度 [安全/性能/逻辑]，JSON 格式'",
   run_in_background: true,
   timeout: 3600000,
   description: "Codex-A 安全+性能+逻辑审查"
@@ -52,17 +50,7 @@ EOF",
 
 Codex-B（架构一致性 + 代码质量）:
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} resume {{CODEX_B_SESSION}} - \"$(pwd)\" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/reviewer.md
-<TASK>
-审查以下代码变更：
-{{DIFF_CONTENT}}
-你负责 2 个维度的审查，每个维度独立输出：
-1. **架构一致性**：模块划分合理性、设计模式一致性、接口设计、可扩展性、与项目现有架构的契合度
-2. **代码质量**：可读性、可维护性、命名规范、错误处理风格、测试覆盖建议、重复代码
-</TASK>
-OUTPUT: 按 Critical/Major/Minor/Suggestion 分类列出问题，每条标注所属维度 [架构/质量]，JSON 格式
-EOF",
+  command: "python \"<BRIDGE>\" --cd \"$(pwd)\" --role \"<PLUGIN_ROOT>/prompts/codex/reviewer.md\" --sandbox read-only{{CODEX_B_SESSION_ARG}} --PROMPT '审查以下代码变更：\n{{DIFF_CONTENT}}\n你负责 2 个维度的审查，每个维度独立输出：\n1. **架构一致性**：模块划分合理性、设计模式一致性、接口设计、可扩展性、与项目现有架构的契合度\n2. **代码质量**：可读性、可维护性、命名规范、错误处理风格、测试覆盖建议、重复代码\nOUTPUT: 按 Critical/Major/Minor/Suggestion 分类列出问题，每条标注所属维度 [架构/质量]，JSON 格式'",
   run_in_background: true,
   timeout: 3600000,
   description: "Codex-B 架构+质量审查"

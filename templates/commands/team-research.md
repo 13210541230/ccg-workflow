@@ -36,10 +36,18 @@ description: 'Agent Teams 需求研究 - 并行探索代码库，产出约束集
    - **CRITICAL**: 必须在一条消息中同时发起两个 Bash 调用。
    - **工作目录**：`{{WORKDIR}}` 替换为目标工作目录的绝对路径。
 
+   **环境准备**（每次会话首次调用前执行一次）：
+   ```
+   Bash({
+     command: "P=\"$HOME/.claude/plugins/cache/ccg-plugin/ccg\"; R=$(ls -1d \"$P\"/*/ 2>/dev/null | sort -V | tail -1 | sed 's|/$||'); B=\"$R/scripts/codex_bridge.py\"; echo \"PLUGIN_ROOT=$R\"; python --version 2>&1; [ -f \"$B\" ] && echo \"BRIDGE=$B\" && echo 'OK' || echo 'BRIDGE MISSING'",
+     description: "解析 codex_bridge.py 路径"
+   })
+   ```
+
    **FIRST Bash call (Codex)**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/analyzer.md\n<TASK>\n需求：<增强后的需求>\n探索范围：后端相关上下文边界\n</TASK>\nOUTPUT (JSON):\n{\n  \"module_name\": \"探索的上下文边界\",\n  \"existing_structures\": [\"发现的关键模式\"],\n  \"existing_conventions\": [\"使用中的规范\"],\n  \"constraints_discovered\": [\"限制解决方案空间的硬约束\"],\n  \"open_questions\": [\"需要用户确认的歧义\"],\n  \"dependencies\": [\"跨模块依赖\"],\n  \"risks\": [\"潜在阻碍\"],\n  \"success_criteria_hints\": [\"可观测的成功行为\"]\n}\nEOF",
+     command: "python \"<BRIDGE>\" --cd \"{{WORKDIR}}\" --role \"<PLUGIN_ROOT>/prompts/codex/analyzer.md\" --sandbox read-only --PROMPT '需求：<增强后的需求>\n探索范围：后端相关上下文边界\nOUTPUT (JSON):\n{\n  \"module_name\": \"探索的上下文边界\",\n  \"existing_structures\": [\"发现的关键模式\"],\n  \"existing_conventions\": [\"使用中的规范\"],\n  \"constraints_discovered\": [\"限制解决方案空间的硬约束\"],\n  \"open_questions\": [\"需要用户确认的歧义\"],\n  \"dependencies\": [\"跨模块依赖\"],\n  \"risks\": [\"潜在阻碍\"],\n  \"success_criteria_hints\": [\"可观测的成功行为\"]\n}'",
      run_in_background: true,
      timeout: 3600000,
      description: "Codex 后端探索"
@@ -49,7 +57,7 @@ description: 'Agent Teams 需求研究 - 并行探索代码库，产出约束集
    **SECOND Bash call (Codex) - IN THE SAME MESSAGE**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/analyzer.md\n<TASK>\n需求：<增强后的需求>\n探索范围：架构设计相关上下文边界\n</TASK>\nOUTPUT (JSON):\n{\n  \"module_name\": \"探索的上下文边界\",\n  \"existing_structures\": [\"发现的关键模式\"],\n  \"existing_conventions\": [\"使用中的规范\"],\n  \"constraints_discovered\": [\"限制解决方案空间的硬约束\"],\n  \"open_questions\": [\"需要用户确认的歧义\"],\n  \"dependencies\": [\"跨模块依赖\"],\n  \"risks\": [\"潜在阻碍\"],\n  \"success_criteria_hints\": [\"可观测的成功行为\"]\n}\nEOF",
+     command: "python \"<BRIDGE>\" --cd \"{{WORKDIR}}\" --role \"<PLUGIN_ROOT>/prompts/codex/analyzer.md\" --sandbox read-only --PROMPT '需求：<增强后的需求>\n探索范围：架构设计相关上下文边界\nOUTPUT (JSON):\n{\n  \"module_name\": \"探索的上下文边界\",\n  \"existing_structures\": [\"发现的关键模式\"],\n  \"existing_conventions\": [\"使用中的规范\"],\n  \"constraints_discovered\": [\"限制解决方案空间的硬约束\"],\n  \"open_questions\": [\"需要用户确认的歧义\"],\n  \"dependencies\": [\"跨模块依赖\"],\n  \"risks\": [\"潜在阻碍\"],\n  \"success_criteria_hints\": [\"可观测的成功行为\"]\n}'",
      run_in_background: true,
      timeout: 3600000,
      description: "Codex 架构探索"
@@ -62,12 +70,11 @@ description: 'Agent Teams 需求研究 - 并行探索代码库，产出约束集
    TaskOutput({ task_id: "<codex_task_id_2>", block: true, timeout: 600000 })
    ```
 
-   **输出丢失检测**（⚠️ 必须执行）：
-   - 每次 `TaskOutput` 返回后，**立即检查 `<output>` 部分是否为空或缺失**。
-   - 若输出为空但 `exit_code: 0`：先用 `Read` 工具读取输出文件（路径在启动时的 `Output is being written to:` 中，使用 Windows 绝对路径格式）。若临时文件已清理，用 `Glob` 查找 `~/.claude/.ccg/outputs/*.txt` 读取最新文件。若仍无，用相同命令重新调用（resume 复用会话）。
-   - **禁止**：跳过空输出继续下一阶段、用 `cat` 命令读文件。
+   **输出处理**：
+   - codex_bridge.py 返回 JSON，从 `agent_messages` 读取 Codex 分析结果。
+   - 若 `success: false`，检查 `error` 字段，用 `--return-all-messages` 重跑获取完整信息。
 
-   **📌 保存 SESSION_ID**：从 Codex 输出中提取 `SESSION_ID`，分别保存为 `CODEX_RESEARCH_SESSION` 和 `CODEX_B_RESEARCH_SESSION`，供后续 `/ccg:team-plan` 复用。
+   **📌 保存 SESSION_ID**：从 JSON 输出的 `SESSION_ID` 字段提取，分别保存为 `CODEX_RESEARCH_SESSION` 和 `CODEX_B_RESEARCH_SESSION`，供后续 `/ccg:team-plan` 通过 `--SESSION_ID` 复用。
 
 4. **聚合与综合**
    - 合并所有探索输出为统一约束集：

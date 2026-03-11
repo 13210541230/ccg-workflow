@@ -12,7 +12,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Task|TaskCreate",
+        "matcher": "Task|TaskCreate|Agent",
         "hooks": [
           {
             "type": "command",
@@ -32,7 +32,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Task|TaskOutput",
+        "matcher": "Task|TaskOutput|Agent",
         "hooks": [
           {
             "type": "command",

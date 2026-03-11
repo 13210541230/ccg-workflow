@@ -22,24 +22,21 @@
 
 ## 调用规范（Codex 模式）
 
-使用 codeagent-wrapper 调用 Codex 生成测试。
+**步骤 0：解析 codex_bridge.py 路径**
+
+Bash({
+  command: "P=\"$HOME/.claude/plugins/cache/ccg-plugin/ccg\"; R=$(ls -1d \"$P\"/*/ 2>/dev/null | sort -V | tail -1 | sed 's|/$||'); B=\"$R/scripts/codex_bridge.py\"; echo \"PLUGIN_ROOT=$R\"; [ -f \"$B\" ] && echo \"BRIDGE=$B OK\" || echo 'BRIDGE MISSING'",
+  description: "解析 codex_bridge.py 路径"
+})
+
+将输出中的 `PLUGIN_ROOT` 和 `BRIDGE` 值记为 `<PLUGIN_ROOT>` 和 `<BRIDGE>`，后续步骤引用。
+
+使用 codex_bridge.py 调用 Codex 生成测试。
 
 **步骤 1：生成测试**
 
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - \"$(pwd)\" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/tester.md
-<TASK>
-为以下文件生成测试：
-{{CHANGED_FILES}}
-上下文：{{PROJECT_CONTEXT}}
-要求：
-- 遵循项目现有测试框架和风格
-- 覆盖正常路径 + 边界条件 + 异常处理
-- 测试应自解释，非必要不加注释
-</TASK>
-OUTPUT: 完整的测试代码（含文件路径和内容）
-EOF",
+  command: "python \"<BRIDGE>\" --cd \"$(pwd)\" --role \"<PLUGIN_ROOT>/prompts/codex/tester.md\" --sandbox read-only --PROMPT '为以下文件生成测试：\n{{CHANGED_FILES}}\n上下文：{{PROJECT_CONTEXT}}\n要求：\n- 遵循项目现有测试框架和风格\n- 覆盖正常路径 + 边界条件 + 异常处理\n- 测试应自解释，非必要不加注释\nOUTPUT: 完整的测试代码（含文件路径和内容）'",
   run_in_background: true,
   timeout: 3600000,
   description: "Codex 测试生成"

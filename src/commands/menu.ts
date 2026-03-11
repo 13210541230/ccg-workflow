@@ -196,16 +196,17 @@ async function configApi(): Promise<void> {
   settings.env.CLAUDE_CODE_ATTRIBUTION_HEADER = '0'
   settings.env.MCP_TIMEOUT = '60000'
 
-  // codeagent-wrapper 权限白名单
+  // CCG 运行链路权限白名单
   if (!settings.permissions)
     settings.permissions = {}
   if (!settings.permissions.allow)
     settings.permissions.allow = []
-  const wrapperPerms = [
-    'Bash(~/.claude/bin/codeagent-wrapper --backend gemini*)',
-    'Bash(~/.claude/bin/codeagent-wrapper --backend codex*)',
+  const workflowPerms = [
+    'Bash(bash */scripts/assemble-prompt.sh*)',
+    'Bash(python */scripts/codex_bridge.py*)',
+    'Bash(python */skills/codex-runtime/scripts/ccg-codex-run.py*)',
   ]
-  for (const perm of wrapperPerms) {
+  for (const perm of workflowPerms) {
     if (!settings.permissions.allow.includes(perm))
       settings.permissions.allow.push(perm)
   }
@@ -469,13 +470,9 @@ async function uninstall(): Promise<void> {
     if (result.removedSkills.length > 0) {
       console.log()
       console.log(ansis.cyan('已移除 Skills:'))
-      console.log(`  ${ansis.gray('•')} multi-model-collaboration`)
-    }
-
-    if (result.removedBin) {
-      console.log()
-      console.log(ansis.cyan('已移除二进制文件:'))
-      console.log(`  ${ansis.gray('•')} codeagent-wrapper`)
+      for (const skill of result.removedSkills) {
+        console.log(`  ${ansis.gray('•')} ${skill}`)
+      }
     }
 
     // If globally installed, show instructions to uninstall npm package

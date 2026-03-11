@@ -32,9 +32,9 @@ description: '后端专项工作流（研究→构思→计划→执行→优化
 
 | 阶段 | Codex |
 |------|-------|
-| 分析 | `~/.claude/.ccg/prompts//analyzer.md` |
-| 规划 | `~/.claude/.ccg/prompts//architect.md` |
-| 审查 | `~/.claude/.ccg/prompts//reviewer.md` |
+| 分析 | `~/.claude/.ccg/prompts/codex/analyzer.md` |
+| 规划 | `~/.claude/.ccg/prompts/codex/architect.md` |
+| 审查 | `~/.claude/.ccg/prompts/codex/reviewer.md` |
 
 **会话复用**：阶段 2 保存 `CODEX_SESSION`，阶段 3 和 5 使用 `resume` 复用。
 

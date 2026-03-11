@@ -12,6 +12,7 @@ description: 'Agent Teams 并行实施 - 读取计划文件，spawn Builder team
 - **Agent Teams 必须启用**：需要 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`。
 - Lead 绝不直接修改产品代码。
 - 每个 Builder 只能修改分配给它的文件。
+- 该命令不是独立的 decision-complete 模板；`TeamCreate` 参数、Builder 类型、依赖表达、阻塞消息回复协议和 prompt 来源以 `manage.md` 为唯一权威。
 
 **Steps**
 1. **前置检查**
@@ -37,8 +38,8 @@ description: 'Agent Teams 并行实施 - 读取计划文件，spawn Builder team
      ```
 
 3. **创建 Team + spawn Builders**
-   - 创建 Agent Team。
-   - 按 Layer 分组 spawn Builder teammates（Sonnet）。
+   - 创建 Agent Team，并按 `manage.md` 中的实现协议进入 delegate-only 模式。
+   - 按 Layer 分组 spawn Builder teammates；若缺少 `manage.md` 所要求的计划字段、命名规则或依赖信息，则终止并提示回到 `/ccg:manage` 或 `/ccg:team-plan` 重新生成。
    - 每个 Builder 的 spawn prompt 必须包含：
 
    ```
@@ -67,7 +68,9 @@ description: 'Agent Teams 并行实施 - 读取计划文件，spawn Builder team
    完成所有步骤后，标记任务为 completed。
    ```
 
-   - **依赖关系**：Layer 2 的 Builder 任务设为依赖 Layer 1 的对应任务，等 Layer 1 完成后自动解锁。
+   - **依赖关系**：仅使用计划文件中已明确声明的 Layer 依赖；不要在本命令中临时发明额外依赖语义。
+   - **消息协议**：Builder 的阻塞式求助与 Lead 回复格式沿用 `manage.md` 的 `SendMessage` 约定。
+   - **prompt 来源**：Builder prompt 必须来自计划产物或 `manage.md` 约定的模板，不得现场手写替代版本。
    - spawn 完成后，进入 **delegate 模式**，只协调不写码。
 
 4. **监控进度**

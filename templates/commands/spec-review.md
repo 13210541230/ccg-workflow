@@ -29,12 +29,20 @@ description: '双模型交叉审查（独立工具，随时可用）'
    - **DO NOT** call one instance first and wait. Launch BOTH simultaneously with `run_in_background: true`.
    - **工作目录**：`{{WORKDIR}}` 替换为目标工作目录的绝对路径。如果用户通过 `/add-dir` 添加了多个工作区，先确定任务相关的工作区。
 
+   **环境准备**（每次会话首次调用前执行一次）：
+   ```
+   Bash({
+     command: "P=\"$HOME/.claude/plugins/cache/ccg-plugin/ccg\"; R=$(ls -1d \"$P\"/*/ 2>/dev/null | sort -V | tail -1 | sed 's|/$||'); B=\"$R/scripts/codex_bridge.py\"; echo \"PLUGIN_ROOT=$R\"; python --version 2>&1; [ -f \"$B\" ] && echo \"BRIDGE=$B\" && echo 'OK' || echo 'BRIDGE MISSING'",
+     description: "解析 codex_bridge.py 路径"
+   })
+   ```
+
    **Step 3.1**: In ONE message, make TWO parallel Bash calls:
 
    **FIRST Bash call (Codex)**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --backend ${CCG_BACKEND:-codex} - \"{{WORKDIR}}\" <<'EOF'\nReview proposal <proposal_id> implementation:\n\n## Codex Review Dimensions\n1. **Spec Compliance**: Verify ALL constraints from spec are satisfied\n2. **PBT Properties**: Check invariants, idempotency, bounds are correctly implemented\n3. **Logic Correctness**: Edge cases, error handling, algorithm correctness\n4. **Backend Security**: Injection vulnerabilities, auth checks, input validation\n5. **Regression Risk**: Interface compatibility, type safety, breaking changes\n\n## Output Format (JSON)\n{\n  \"findings\": [\n    {\n      \"severity\": \"Critical|Warning|Info\",\n      \"dimension\": \"spec_compliance|pbt|logic|security|regression\",\n      \"file\": \"path/to/file.ts\",\n      \"line\": 42,\n      \"description\": \"What is wrong\",\n      \"constraint_violated\": \"Constraint ID from spec (if applicable)\",\n      \"fix_suggestion\": \"How to fix\"\n    }\n  ],\n  \"passed_checks\": [\"List of verified constraints/properties\"],\n  \"summary\": \"Overall assessment\"\n}\nEOF",
+     command: "python \"<BRIDGE>\" --cd \"{{WORKDIR}}\" --role \"<PLUGIN_ROOT>/prompts/codex/reviewer.md\" --sandbox read-only --PROMPT 'Review proposal <proposal_id> implementation:\n\n## Codex Review Dimensions\n1. **Spec Compliance**: Verify ALL constraints from spec are satisfied\n2. **PBT Properties**: Check invariants, idempotency, bounds are correctly implemented\n3. **Logic Correctness**: Edge cases, error handling, algorithm correctness\n4. **Backend Security**: Injection vulnerabilities, auth checks, input validation\n5. **Regression Risk**: Interface compatibility, type safety, breaking changes\n\n## Output Format (JSON)\n{\n  \"findings\": [\n    {\n      \"severity\": \"Critical|Warning|Info\",\n      \"dimension\": \"spec_compliance|pbt|logic|security|regression\",\n      \"file\": \"path/to/file.ts\",\n      \"line\": 42,\n      \"description\": \"What is wrong\",\n      \"constraint_violated\": \"Constraint ID from spec (if applicable)\",\n      \"fix_suggestion\": \"How to fix\"\n    }\n  ],\n  \"passed_checks\": [\"List of verified constraints/properties\"],\n  \"summary\": \"Overall assessment\"\n}'",
      run_in_background: true,
      timeout: 300000,
      description: "Codex: backend/logic review"
@@ -44,7 +52,7 @@ description: '双模型交叉审查（独立工具，随时可用）'
    **SECOND Bash call (Codex) - IN THE SAME MESSAGE**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --backend ${CCG_BACKEND:-codex} - \"{{WORKDIR}}\" <<'EOF'\nReview proposal <proposal_id> implementation:\n\n## Codex Architecture Review Dimensions\n1. **Pattern Consistency**: Naming conventions, code style, project patterns\n2. **Maintainability**: Readability, complexity, documentation adequacy\n3. **Integration Risk**: Dependency changes, cross-module impacts\n4. **Architecture Security**: XSS, CSRF, sensitive data exposure\n5. **Spec Alignment**: Implementation matches spec intent (not just letter)\n\n## Output Format (JSON)\n{\n  \"findings\": [\n    {\n      \"severity\": \"Critical|Warning|Info\",\n      \"dimension\": \"patterns|maintainability|integration|security|alignment\",\n      \"file\": \"path/to/file.ts\",\n      \"line\": 42,\n      \"description\": \"What is wrong\",\n      \"spec_reference\": \"Spec section (if applicable)\",\n      \"fix_suggestion\": \"How to fix\"\n    }\n  ],\n  \"passed_checks\": [\"List of verified aspects\"],\n  \"summary\": \"Overall assessment\"\n}\nEOF",
+     command: "python \"<BRIDGE>\" --cd \"{{WORKDIR}}\" --role \"<PLUGIN_ROOT>/prompts/codex/reviewer.md\" --sandbox read-only --PROMPT 'Review proposal <proposal_id> implementation:\n\n## Codex Architecture Review Dimensions\n1. **Pattern Consistency**: Naming conventions, code style, project patterns\n2. **Maintainability**: Readability, complexity, documentation adequacy\n3. **Integration Risk**: Dependency changes, cross-module impacts\n4. **Architecture Security**: XSS, CSRF, sensitive data exposure\n5. **Spec Alignment**: Implementation matches spec intent (not just letter)\n\n## Output Format (JSON)\n{\n  \"findings\": [\n    {\n      \"severity\": \"Critical|Warning|Info\",\n      \"dimension\": \"patterns|maintainability|integration|security|alignment\",\n      \"file\": \"path/to/file.ts\",\n      \"line\": 42,\n      \"description\": \"What is wrong\",\n      \"spec_reference\": \"Spec section (if applicable)\",\n      \"fix_suggestion\": \"How to fix\"\n    }\n  ],\n  \"passed_checks\": [\"List of verified aspects\"],\n  \"summary\": \"Overall assessment\"\n}'",
      run_in_background: true,
      timeout: 300000,
      description: "Codex: patterns/integration review"
@@ -57,7 +65,7 @@ description: '双模型交叉审查（独立工具，随时可用）'
    TaskOutput({ task_id: "<codex_task_id_2>", block: true, timeout: 600000 })
    ```
 
-   **Output loss detection** (⚠️ mandatory): If `TaskOutput` returns `exit_code: 0` but `<output>` is empty, use `Read` tool to read the output file (path from `Output is being written to:`, use Windows absolute path format). If temp file is gone, use `Glob` to find `~/.claude/.ccg/outputs/*.txt` and read the latest. If still missing, re-run with `resume`. NEVER skip empty output.
+   **Output loss detection** (⚠️ mandatory): If `TaskOutput` returns `exit_code: 0` but `<output>` is empty, use `Read` tool to read the output file (path from `Output is being written to:`, use Windows absolute path format). If temp file is gone, use `Glob` to find `~/.claude/.ccg/outputs/*.txt` and read the latest. If still missing, re-run with `--SESSION_ID` to reuse session. NEVER skip empty output.
 
 4. **Synthesize Findings**
    - Merge findings from both models.

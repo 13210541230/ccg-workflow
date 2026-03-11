@@ -26,21 +26,22 @@
 
 ## 调用规范（Codex 模式）
 
-使用 codeagent-wrapper 并行调用 Codex-A（后端规划）和 Codex-B（架构规划），复用分析阶段的会话。
+**步骤 0：解析 codex_bridge.py 路径**
+
+Bash({
+  command: "P=\"$HOME/.claude/plugins/cache/ccg-plugin/ccg\"; R=$(ls -1d \"$P\"/*/ 2>/dev/null | sort -V | tail -1 | sed 's|/$||'); B=\"$R/scripts/codex_bridge.py\"; echo \"PLUGIN_ROOT=$R\"; [ -f \"$B\" ] && echo \"BRIDGE=$B OK\" || echo 'BRIDGE MISSING'",
+  description: "解析 codex_bridge.py 路径"
+})
+
+将输出中的 `PLUGIN_ROOT` 和 `BRIDGE` 值记为 `<PLUGIN_ROOT>` 和 `<BRIDGE>`，后续步骤引用。
+
+使用 codex_bridge.py 并行调用 Codex-A（后端规划）和 Codex-B（架构规划），复用分析阶段的会话。
 
 **并行调用 Codex（必须同时发起两个 Bash 调用）**
 
 Codex-A（后端规划）:
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} resume {{CODEX_SESSION}} - \"$(pwd)\" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/architect.md
-<TASK>
-需求：{{TASK_CONTENT}}
-上下文：{{ANALYZE_FINDINGS}}
-视角：后端实施规划——数据流、边界条件、错误处理、测试策略
-</TASK>
-OUTPUT: Step-by-step implementation plan with pseudo-code. DO NOT modify any files.
-EOF",
+  command: "python \"<BRIDGE>\" --cd \"$(pwd)\" --role \"<PLUGIN_ROOT>/prompts/codex/architect.md\" --sandbox read-only{{CODEX_SESSION_ARG}} --PROMPT '需求：{{TASK_CONTENT}}\n上下文：{{ANALYZE_FINDINGS}}\n视角：后端实施规划——数据流、边界条件、错误处理、测试策略\nOUTPUT: Step-by-step implementation plan with pseudo-code. DO NOT modify any files.'",
   run_in_background: true,
   timeout: 3600000,
   description: "Codex-A 后端规划"
@@ -48,15 +49,7 @@ EOF",
 
 Codex-B（架构规划）:
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} resume {{CODEX_B_SESSION}} - \"$(pwd)\" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/architect.md
-<TASK>
-需求：{{TASK_CONTENT}}
-上下文：{{ANALYZE_FINDINGS}}
-视角：架构设计规划——架构设计、模块划分、可扩展性、一致性
-</TASK>
-OUTPUT: Step-by-step implementation plan with pseudo-code. DO NOT modify any files.
-EOF",
+  command: "python \"<BRIDGE>\" --cd \"$(pwd)\" --role \"<PLUGIN_ROOT>/prompts/codex/architect.md\" --sandbox read-only{{CODEX_B_SESSION_ARG}} --PROMPT '需求：{{TASK_CONTENT}}\n上下文：{{ANALYZE_FINDINGS}}\n视角：架构设计规划——架构设计、模块划分、可扩展性、一致性\nOUTPUT: Step-by-step implementation plan with pseudo-code. DO NOT modify any files.'",
   run_in_background: true,
   timeout: 3600000,
   description: "Codex-B 架构规划"

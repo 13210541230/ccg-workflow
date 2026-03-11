@@ -22,25 +22,20 @@ $ARGUMENTS
 
 > **必须先读取共享规范**：使用 Read 工具读取 `~/.claude/.ccg/shared/multi-model-spec.md` 获取调用语法、等待规范、输出丢失检测等通用规范。读取后严格遵循其中的规范执行。
 
+**环境准备**（每次会话首次调用前执行一次）：
+
+```
+Bash({
+  command: "P=\"$HOME/.claude/plugins/cache/ccg-plugin/ccg\"; R=$(ls -1d \"$P\"/*/ 2>/dev/null | sort -V | tail -1 | sed 's|/$||'); B=\"$R/scripts/codex_bridge.py\"; echo \"PLUGIN_ROOT=$R\"; python --version 2>&1; [ -f \"$B\" ] && echo \"BRIDGE=$B\" && echo 'OK' || echo 'BRIDGE MISSING'",
+  description: "解析 codex_bridge.py 路径"
+})
+```
+
 **审计调用语法**（Code Review / Audit）：
 
 ```
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} resume <SESSION_ID> - \"{{WORKDIR}}\" <<'EOF'
-ROLE_FILE: <角色提示词路径>
-<TASK>
-Scope: Audit the final code changes.
-Inputs:
-- The applied patch (git diff / final unified diff)
-- The touched files (relevant excerpts if needed)
-Constraints:
-- Do NOT modify any files.
-- Do NOT output tool commands that assume filesystem access.
-</TASK>
-OUTPUT:
-1) A prioritized list of issues (severity, file, rationale)
-2) Concrete fixes; if code changes are needed, include a Unified Diff Patch in a fenced code block.
-EOF",
+  command: "python \"<BRIDGE>\" --cd \"{{WORKDIR}}\" --SESSION_ID <SESSION_ID> --role \"<PLUGIN_ROOT>/prompts/codex/<role>.md\" --sandbox read-only --PROMPT 'Scope: Audit the final code changes.\nInputs:\n- The applied patch (git diff / final unified diff)\n- The touched files (relevant excerpts if needed)\nConstraints:\n- Do NOT modify any files.\n- Do NOT output tool commands that assume filesystem access.\nOUTPUT:\n1) A prioritized list of issues (severity, file, rationale)\n2) Concrete fixes; if code changes are needed, include a Unified Diff Patch in a fenced code block.'",
   run_in_background: true,
   timeout: 3600000,
   description: "简短描述"
@@ -51,10 +46,10 @@ EOF",
 
 | 阶段 | Codex-A | Codex-B |
 |------|---------|---------|
-| 实施 | `~/.claude/.ccg/prompts//architect.md` | `~/.claude/.ccg/prompts//architect.md` |
-| 审查 | `~/.claude/.ccg/prompts//reviewer.md` | `~/.claude/.ccg/prompts//reviewer.md` |
+| 实施 | `<PLUGIN_ROOT>/prompts/codex/architect.md` | `<PLUGIN_ROOT>/prompts/codex/architect.md` |
+| 审查 | `<PLUGIN_ROOT>/prompts/codex/reviewer.md` | `<PLUGIN_ROOT>/prompts/codex/reviewer.md` |
 
-**会话复用**：如果 `/ccg:plan` 提供了 SESSION_ID，使用 `resume <SESSION_ID>` 复用上下文。
+**会话复用**：如果 `/ccg:plan` 提供了 SESSION_ID，使用 `--SESSION_ID <SESSION_ID>` 复用上下文。
 
 ---
 
@@ -124,19 +119,19 @@ EOF",
 
 #### Route A: 前端/UI/样式 → Codex
 
-1. 调用 Codex（使用 `~/.claude/.ccg/prompts//architect.md`）
+1. 调用 Codex（使用 `<PLUGIN_ROOT>/prompts/codex/architect.md`）
 2. 输入：计划内容 + 检索到的上下文 + 目标文件
 3. OUTPUT: `Unified Diff Patch ONLY. Strictly prohibit any actual modifications.`
 4. **Codex 架构视角，综合前端设计与架构一致性**
-5. 若计划包含 `CODEX_B_SESSION`：优先 `resume <CODEX_B_SESSION>`
+5. 若计划包含 `CODEX_B_SESSION`：优先 `--SESSION_ID <CODEX_B_SESSION>`
 
 #### Route B: 后端/逻辑/算法 → Codex
 
-1. 调用 Codex（使用 `~/.claude/.ccg/prompts//architect.md`）
+1. 调用 Codex（使用 `<PLUGIN_ROOT>/prompts/codex/architect.md`）
 2. 输入：计划内容 + 检索到的上下文 + 目标文件
 3. OUTPUT: `Unified Diff Patch ONLY. Strictly prohibit any actual modifications.`
 4. **Codex 是后端逻辑的权威，利用其逻辑运算与 Debug 能力**
-5. 若计划包含 `CODEX_SESSION`：优先 `resume <CODEX_SESSION>`
+5. 若计划包含 `CODEX_SESSION`：优先 `--SESSION_ID <CODEX_SESSION>`
 
 #### Route C: 全栈 → 并行调用
 
@@ -144,7 +139,7 @@ EOF",
    - Codex-A：处理后端部分
    - Codex-B：处理前端/架构部分
 2. 用 `TaskOutput` 等待两个模型的完整结果
-3. 各自使用计划中对应的 `SESSION_ID` 进行 `resume`（若缺失则创建新会话）
+3. 各自使用计划中对应的 `SESSION_ID` 通过 `--SESSION_ID` 复用（若缺失则创建新会话）
 
 **务必遵循上方 `多模型调用规范` 的 `重要` 指示**
 
@@ -192,16 +187,16 @@ EOF",
 **变更生效后，强制立即并行调用** Codex-A 和 Codex-B 进行 Code Review：
 
 1. **Codex-A 审查**（`run_in_background: true`）：
-   - ROLE_FILE: `~/.claude/.ccg/prompts/$CCG_BACKEND/reviewer.md`
+   - role: `<PLUGIN_ROOT>/prompts/codex/reviewer.md`
    - 输入：变更的 Diff + 目标文件
    - 关注：安全性、性能、错误处理、逻辑正确性
 
 2. **Codex-B 审查**（`run_in_background: true`）：
-   - ROLE_FILE: `~/.claude/.ccg/prompts/$CCG_BACKEND/reviewer.md`
+   - role: `<PLUGIN_ROOT>/prompts/codex/reviewer.md`
    - 输入：变更的 Diff + 目标文件
    - 关注：架构一致性、设计合理性、可扩展性
 
-用 `TaskOutput` 等待两个模型的完整审查结果。优先复用 Phase 3 的会话（`resume <SESSION_ID>`）以保持上下文一致。
+用 `TaskOutput` 等待两个模型的完整审查结果。优先复用 Phase 3 的会话（`--SESSION_ID <SESSION_ID>`）以保持上下文一致。
 
 #### 5.2 整合修复
 

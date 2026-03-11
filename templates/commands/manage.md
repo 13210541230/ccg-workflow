@@ -17,7 +17,7 @@ $ARGUMENTS
 - **源码隔离**：主Agent**禁止**直接 Edit/Write 项目源代码。仅允许修改 `.claude/plan/` 下的状态文件。所有源码修改必须通过 execute-worker 子Agent 完成
 - **止损机制**：当前阶段输出通过验证前，不进入下一阶段
 - **状态驱动**：所有进度通过状态文件追踪（格式见 `<PLUGIN_ROOT>/shared/manage-state-format.md`）
-- **Hooks 保障**：插件 hooks 在 Task 前后自动注入状态提醒，PostToolUse hook 输出 6 步清单
+- **Hooks 保障**：插件 hooks 在 Task / Agent 前后自动注入状态提醒，PostToolUse hook 输出 6 步清单
 
 ---
 
@@ -50,6 +50,17 @@ Bash({
 ```
 
 保存为 `PLUGIN_ROOT`。若 `PLUGIN_ROOT_NOT_FOUND` → 终止。后续所有路径引用均使用此绝对路径。
+
+验证 codex_bridge.py 可用：
+
+```
+Bash({
+  command: "[ -f \"<PLUGIN_ROOT>/scripts/codex_bridge.py\" ] && echo 'BRIDGE=<PLUGIN_ROOT>/scripts/codex_bridge.py OK' || echo 'BRIDGE MISSING'",
+  description: "验证 codex_bridge.py 可用"
+})
+```
+
+保存为 `BRIDGE`。若 `BRIDGE MISSING` → 终止。
 
 #### 0.1 会话恢复检测
 
@@ -142,10 +153,12 @@ Glob({ pattern: ".claude/plan/*/progress.md" })
 
 ```
 Bash({
-  command: "bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh <worker-name> --plugin-root <PLUGIN_ROOT> --input-dir <PLAN_DIR>/inputs --output <PLAN_DIR>/prompts/<worker-name>.prompt --plan-dir <PLAN_DIR> [--session <CODEX_SESSION>] [--session-b <CODEX_B_SESSION>]",
+  command: "bash <PLUGIN_ROOT>/scripts/assemble-prompt.sh <worker-name> --plugin-root <PLUGIN_ROOT> --input-dir <PLAN_DIR>/inputs --output <PLAN_DIR>/prompts/<worker-name>.prompt --plan-dir <PLAN_DIR>",
   description: "组装 <worker-name> prompt"
 })
 ```
+
+如需复用会话，在命令末尾按需追加 `--session <CODEX_SESSION>` 与 `--session-b <CODEX_B_SESSION>`。
 
 **自检**：Bash 输出应包含 `已写入:` 和文件大小。若包含 `[assemble-prompt] 错误` 或输出为空，排查后重试。
 

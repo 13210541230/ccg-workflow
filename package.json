@@ -1,6 +1,6 @@
 {
   "name": "ccg-workflow",
-  "version": "1.7.79",
+  "version": "1.7.80",
   "description": "Claude-Codex-Gemini 多模型协作系统 - 智能路由多模型开发工作流",
   "type": "module",
   "packageManager": "pnpm@10.17.1",
@@ -64,9 +64,8 @@
     "templates/prompts/gemini/tester.md",
     "templates/prompts/claude/",
     "templates/output-styles/",
-    "templates/bin/codeagent-persist.sh",
-    "templates/bin/run-wrapper",
     "templates/plugin/",
+    "templates/skills/",
     "templates/commands/manage.md",
     "scripts/build-plugin.mjs"
   ],

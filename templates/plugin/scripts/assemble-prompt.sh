@@ -36,6 +36,8 @@ PLUGIN_ROOT=""
 PLAN_DIR=""
 SESSION_ID=""
 SESSION_B_ID=""
+CODEX_SESSION_ARG=""
+CODEX_B_SESSION_ARG=""
 INPUT_DIR=""
 OUTPUT_FILE=""
 
@@ -76,20 +78,18 @@ fi
 PROMPT=$(<"$TEMPLATE_PATH")
 
 # --- 替换构建变量（对齐 build-plugin.mjs 的 INSTALL_VAR_RULES）---
-# {{LITE_MODE_FLAG}} → --lite（与 build-plugin.mjs 一致）
-PROMPT="${PROMPT//\{\{LITE_MODE_FLAG\}\}/--lite }"
+# {{LITE_MODE_FLAG}} → 空（codex_bridge.py 不需要此参数）
+PROMPT="${PROMPT//\{\{LITE_MODE_FLAG\}\}/}"
 
 # --- 替换路径占位符（对齐 build-plugin.mjs 的 PATH_RULES）---
-# ~/.claude/bin/codeagent-wrapper → $PLUGIN_ROOT/bin/run-wrapper
-PROMPT="${PROMPT//\~\/.claude\/bin\/codeagent-wrapper/${PLUGIN_ROOT}/bin/run-wrapper}"
 # ~/.claude/.ccg/prompts/ → $PLUGIN_ROOT/prompts/
 PROMPT="${PROMPT//\~\/.claude\/.ccg\/prompts\//${PLUGIN_ROOT}/prompts/}"
 # ~/.claude/.ccg/shared/ → $PLUGIN_ROOT/shared/
 PROMPT="${PROMPT//\~\/.claude\/.ccg\/shared\//${PLUGIN_ROOT}/shared/}"
+# ~/.claude/.ccg/scripts/ → $PLUGIN_ROOT/scripts/
+PROMPT="${PROMPT//\~\/.claude\/.ccg\/scripts\//${PLUGIN_ROOT}/scripts/}"
 # ~/.claude/.ccg → 绝对路径（兼容旧引用，放在具体路径之后避免短匹配覆盖长路径）
 PROMPT="${PROMPT//\~\/.claude\/.ccg/${PLUGIN_ROOT}}"
-# ~/.claude/bin/ → $PLUGIN_ROOT/bin/
-PROMPT="${PROMPT//\~\/.claude\/bin\//${PLUGIN_ROOT}/bin/}"
 # $CLAUDE_PLUGIN_ROOT → 绝对路径（用 sed 处理 $ 转义）
 PROMPT=$(printf '%s' "$PROMPT" | sed "s|\\\$CLAUDE_PLUGIN_ROOT|${PLUGIN_ROOT}|g")
 
@@ -113,9 +113,19 @@ PROMPT="${PROMPT//\{\{CHANGED_FILES\}\}/$CHANGED_FILES}"
 PROMPT="${PROMPT//\{\{TEAM_NAME\}\}/$TEAM_NAME}"
 
 # --- 替换 ID 占位符 ---
+if [[ -n "$SESSION_ID" ]]; then
+  CODEX_SESSION_ARG=" --SESSION_ID ${SESSION_ID}"
+fi
+
+if [[ -n "$SESSION_B_ID" ]]; then
+  CODEX_B_SESSION_ARG=" --SESSION_ID ${SESSION_B_ID}"
+fi
+
 PROMPT="${PROMPT//\{\{PLAN_DIR\}\}/${PLAN_DIR}}"
 PROMPT="${PROMPT//\{\{CODEX_SESSION\}\}/${SESSION_ID}}"
 PROMPT="${PROMPT//\{\{CODEX_B_SESSION\}\}/${SESSION_B_ID}}"
+PROMPT="${PROMPT//\{\{CODEX_SESSION_ARG\}\}/${CODEX_SESSION_ARG}}"
+PROMPT="${PROMPT//\{\{CODEX_B_SESSION_ARG\}\}/${CODEX_B_SESSION_ARG}}"
 
 # --- 确保输出目录存在 ---
 mkdir -p "$(dirname "$OUTPUT_FILE")"

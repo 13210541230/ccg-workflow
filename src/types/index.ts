@@ -86,10 +86,9 @@ export interface InstallResult {
   success: boolean
   installedCommands: string[]
   installedPrompts: string[]
+  installedSkills: string[]
   errors: string[]
   configPath: string
-  binPath?: string
-  binInstalled?: boolean
 }
 
 // ace-tool 配置

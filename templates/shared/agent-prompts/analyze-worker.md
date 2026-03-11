@@ -25,6 +25,15 @@
 
 ## 调用规范（Codex 模式）
 
+**步骤 0：解析 codex_bridge.py 路径**
+
+Bash({
+  command: "P=\"$HOME/.claude/plugins/cache/ccg-plugin/ccg\"; R=$(ls -1d \"$P\"/*/ 2>/dev/null | sort -V | tail -1 | sed 's|/$||'); B=\"$R/scripts/codex_bridge.py\"; echo \"PLUGIN_ROOT=$R\"; [ -f \"$B\" ] && echo \"BRIDGE=$B OK\" || echo 'BRIDGE MISSING'",
+  description: "解析 codex_bridge.py 路径"
+})
+
+将输出中的 `PLUGIN_ROOT` 和 `BRIDGE` 值记为 `<PLUGIN_ROOT>` 和 `<BRIDGE>`，后续步骤引用。
+
 **步骤 1：上下文检索**
 
 调用 {{MCP_SEARCH_TOOL}} 检索与任务相关的代码上下文：
@@ -36,15 +45,7 @@
 
 Codex-A（逻辑分析）:
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - \"$(pwd)\" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/analyzer.md
-<TASK>
-需求：{{TASK_CONTENT}}
-上下文：<检索到的代码上下文>
-视角：后端逻辑分析——技术可行性、性能考量、潜在风险、边界条件
-</TASK>
-OUTPUT: JSON格式的分析结果，含 feasibility / risks / recommendations
-EOF",
+  command: "python \"<BRIDGE>\" --cd \"$(pwd)\" --role \"<PLUGIN_ROOT>/prompts/codex/analyzer.md\" --sandbox read-only --PROMPT '需求：{{TASK_CONTENT}}\n上下文：<检索到的代码上下文>\n视角：后端逻辑分析——技术可行性、性能考量、潜在风险、边界条件\nOUTPUT: JSON格式的分析结果，含 feasibility / risks / recommendations'",
   run_in_background: true,
   timeout: 3600000,
   description: "Codex-A 逻辑分析"
@@ -52,15 +53,7 @@ EOF",
 
 Codex-B（架构分析）:
 Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend ${CCG_BACKEND:-codex} - \"$(pwd)\" <<'EOF'
-ROLE_FILE: ~/.claude/.ccg/prompts/$CCG_BACKEND/analyzer.md
-<TASK>
-需求：{{TASK_CONTENT}}
-上下文：<检索到的代码上下文>
-视角：架构设计分析——架构影响、模块划分、可扩展性、设计一致性
-</TASK>
-OUTPUT: JSON格式的分析结果，含 architecture_impact / module_design / recommendations
-EOF",
+  command: "python \"<BRIDGE>\" --cd \"$(pwd)\" --role \"<PLUGIN_ROOT>/prompts/codex/analyzer.md\" --sandbox read-only --PROMPT '需求：{{TASK_CONTENT}}\n上下文：<检索到的代码上下文>\n视角：架构设计分析——架构影响、模块划分、可扩展性、设计一致性\nOUTPUT: JSON格式的分析结果，含 architecture_impact / module_design / recommendations'",
   run_in_background: true,
   timeout: 3600000,
   description: "Codex-B 架构分析"

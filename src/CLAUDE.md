@@ -19,7 +19,7 @@
 
 TypeScript CLI 工具，负责 CCG 多模型协作系统的交互式安装、配置、更新和诊断。用户通过 `npx ccg-workflow` 触发，核心能力：
 
-1. **一键安装** -- 交互式引导用户完成命令模板、专家提示词、codeagent-wrapper 二进制、MCP 配置的安装
+1. **一键安装** -- 交互式引导用户完成命令模板、专家提示词、运行时脚本、Skills、MCP 配置的安装
 2. **交互式菜单** -- 提供初始化/更新/卸载/MCP 配置/API 配置/输出风格/实用工具的统一入口
 3. **MCP 工具管理** -- 支持 fast-context / ace-tool / ace-tool-rs 及辅助 MCP（Context7/Playwright/DeepWiki/Exa）
 4. **跨平台适配** -- Windows MCP 命令包装（cmd /c）、路径规范化、Git Bash 兼容
@@ -168,7 +168,7 @@ export { getCurrentVersion, getLatestVersion, checkForUpdates, compareVersions }
 ### 工具层 (`utils/`)
 | 文件 | 职责 |
 |------|------|
-| `installer.ts` | 核心安装逻辑（命令/提示词/agents/skills/二进制/MCP） |
+| `installer.ts` | 核心安装逻辑（命令/提示词/agents/skills/运行时脚本/MCP） |
 | `config.ts` | CCG 配置管理（TOML 读写） |
 | `mcp.ts` | MCP 配置管理（claude.json 读写/Windows 修复/备份） |
 | `platform.ts` | 跨平台工具（Windows/macOS/Linux 检测、MCP 命令包装） |

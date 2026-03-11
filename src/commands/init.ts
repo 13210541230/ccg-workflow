@@ -407,16 +407,17 @@ export async function init(options: InitOptions = {}): Promise<void> {
       settings.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = '1'
       settings.env.CLAUDE_CODE_ATTRIBUTION_HEADER = '0'
       settings.env.MCP_TIMEOUT = '60000'
-      // codeagent-wrapper 权限白名单
+      // CCG 运行链路权限白名单
       if (!settings.permissions)
         settings.permissions = {}
       if (!settings.permissions.allow)
         settings.permissions.allow = []
-      const wrapperPerms = [
-        'Bash(~/.claude/bin/codeagent-wrapper --backend gemini*)',
-        'Bash(~/.claude/bin/codeagent-wrapper --backend codex*)',
+      const workflowPerms = [
+        'Bash(bash */scripts/assemble-prompt.sh*)',
+        'Bash(python */scripts/codex_bridge.py*)',
+        'Bash(python */skills/codex-runtime/scripts/ccg-codex-run.py*)',
       ]
-      for (const perm of wrapperPerms) {
+      for (const perm of workflowPerms) {
         if (!settings.permissions.allow.includes(perm))
           settings.permissions.allow.push(perm)
       }
@@ -449,6 +450,14 @@ export async function init(options: InitOptions = {}): Promise<void> {
       })
     }
 
+    if (result.installedSkills.length > 0) {
+      console.log()
+      console.log(ansis.cyan('  已安装 Skills:'))
+      result.installedSkills.forEach((skill) => {
+        console.log(`    ${ansis.green('✓')} ${skill}`)
+      })
+    }
+
     // Show errors if any
     if (result.errors.length > 0) {
       console.log()
@@ -456,74 +465,6 @@ export async function init(options: InitOptions = {}): Promise<void> {
       result.errors.forEach((error) => {
         console.log(`    ${ansis.red('✗')} ${error}`)
       })
-    }
-
-    // Show binary installation result
-    if (result.binInstalled && result.binPath) {
-      console.log()
-      console.log(ansis.cyan(`  ${i18n.t('init:installedBinary')}`))
-      console.log(`    ${ansis.green('✓')} codeagent-wrapper ${ansis.gray(`→ ${result.binPath}`)}`)
-
-      const platform = process.platform
-
-      if (platform === 'win32') {
-        const windowsPath = result.binPath.replace(/\//g, '\\').replace(/\\$/, '')
-        try {
-          const { execSync } = await import('node:child_process')
-          const psFlags = '-NoProfile -NonInteractive -ExecutionPolicy Bypass'
-          const currentPath = execSync(`powershell ${psFlags} -Command "[System.Environment]::GetEnvironmentVariable('PATH', 'User')"`, { encoding: 'utf-8' }).trim()
-          const currentPathNorm = currentPath.toLowerCase().replace(/\\$/g, '')
-          const windowsPathNorm = windowsPath.toLowerCase()
-
-          if (!currentPathNorm.includes(windowsPathNorm) && !currentPathNorm.includes('.claude\\bin')) {
-            // Use single quotes in PowerShell to avoid escaping issues; empty PATH means set directly
-            const escapedPath = windowsPath.replace(/'/g, "''")
-            const psScript = currentPath
-              ? `$p=[System.Environment]::GetEnvironmentVariable('PATH','User');[System.Environment]::SetEnvironmentVariable('PATH',($p+';'+'${escapedPath}'),'User')`
-              : `[System.Environment]::SetEnvironmentVariable('PATH','${escapedPath}','User')`
-            execSync(`powershell ${psFlags} -Command "${psScript}"`, { stdio: 'pipe' })
-            console.log(`    ${ansis.green('✓')} PATH ${ansis.gray('→ 用户环境变量')}`)
-          }
-        }
-        catch {
-          // Silently ignore PATH config errors on Windows
-        }
-      }
-      else if (!options.skipPrompt) {
-        const exportCommand = `export PATH="${result.binPath}:$PATH"`
-        const shell = process.env.SHELL || ''
-        const isZsh = shell.includes('zsh')
-        const isBash = shell.includes('bash')
-        const isMacDefaultZsh = process.platform === 'darwin' && !shell
-
-        if (isZsh || isBash || isMacDefaultZsh) {
-          const shellRc = (isZsh || isMacDefaultZsh) ? join(homedir(), '.zshrc') : join(homedir(), '.bashrc')
-          const shellRcDisplay = (isZsh || isMacDefaultZsh) ? '~/.zshrc' : '~/.bashrc'
-
-          try {
-            let rcContent = ''
-            if (await fs.pathExists(shellRc)) {
-              rcContent = await fs.readFile(shellRc, 'utf-8')
-            }
-
-            if (rcContent.includes(result.binPath) || rcContent.includes('/.claude/bin')) {
-              console.log(`    ${ansis.green('✓')} PATH ${ansis.gray(`→ ${shellRcDisplay} (已配置)`)}`)
-            }
-            else {
-              const configLine = `\n# CCG multi-model collaboration system\n${exportCommand}\n`
-              await fs.appendFile(shellRc, configLine, 'utf-8')
-              console.log(`    ${ansis.green('✓')} PATH ${ansis.gray(`→ ${shellRcDisplay}`)}`)
-            }
-          }
-          catch {
-            // Silently ignore PATH config errors
-          }
-        }
-        else {
-          console.log(`    ${ansis.yellow('⚠')} PATH ${ansis.gray('→ 请手动添加到 shell 配置:')}`)
-          console.log(`      ${ansis.cyan(exportCommand)}`)
-        }
-      }
     }
 
     // Show MCP resources if user skipped installation

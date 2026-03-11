@@ -431,8 +431,7 @@ export function injectConfigVariables(content: string, config: {
   const routingMode = routing.mode || 'smart'
   processed = processed.replace(/\{\{ROUTING_MODE\}\}/g, routingMode)
 
-  // Lite mode flag for codeagent-wrapper
-  // If liteMode is true, inject "--lite" flag
+  // Legacy lite-mode placeholder, kept for template compatibility
   const liteModeFlag = config.liteMode ? '--lite ' : ''
   processed = processed.replace(/\{\{LITE_MODE_FLAG\}\}/g, liteModeFlag)
 
@@ -525,7 +524,6 @@ function replaceHomePathsInTemplate(content: string, installDir: string): string
   // Get absolute paths for replacement
   const userHome = homedir()
   const ccgDir = join(installDir, '.ccg')
-  const binDir = join(installDir, 'bin')
   const claudeDir = installDir // ~/.claude
 
   // IMPORTANT: Always use forward slashes for cross-platform compatibility
@@ -539,19 +537,10 @@ function replaceHomePathsInTemplate(content: string, installDir: string): string
   // 1. Replace ~/.claude/.ccg with absolute path (longest match first)
   processed = processed.replace(/~\/\.claude\/\.ccg/g, normalizePath(ccgDir))
 
-  // 2. Replace ~/.claude/bin/codeagent-wrapper with persist wrapper script path
-  //    codeagent-persist.sh tees output to ~/.claude/.ccg/outputs/ as fallback
-  //    for Claude Code TaskOutput temp file loss (race condition with parallel tasks)
-  const wrapperPath = `${normalizePath(binDir)}/codeagent-persist.sh`
-  processed = processed.replace(/~\/\.claude\/bin\/codeagent-wrapper/g, wrapperPath)
-
-  // 3. Replace ~/.claude/bin with absolute path (for other binaries)
-  processed = processed.replace(/~\/\.claude\/bin/g, normalizePath(binDir))
-
-  // 4. Replace ~/.claude with absolute path
+  // 2. Replace ~/.claude with absolute path
   processed = processed.replace(/~\/\.claude/g, normalizePath(claudeDir))
 
-  // 5. Replace remaining ~/ patterns with user home
+  // 3. Replace remaining ~/ patterns with user home
   processed = processed.replace(/~\//g, `${normalizePath(userHome)}/`)
 
   return processed
@@ -587,6 +576,7 @@ export async function installWorkflows(
     success: true,
     installedCommands: [],
     installedPrompts: [],
+    installedSkills: [],
     errors: [],
     configPath: '',
   }
@@ -594,10 +584,12 @@ export async function installWorkflows(
   const commandsDir = join(installDir, 'commands', 'ccg')
   const ccgConfigDir = join(installDir, '.ccg') // v1.4.0: 配置目录
   const promptsDir = join(ccgConfigDir, 'prompts') // v1.4.0: prompts 移到配置目录
+  const scriptsDir = join(ccgConfigDir, 'scripts')
 
   await fs.ensureDir(commandsDir)
   await fs.ensureDir(ccgConfigDir)
   await fs.ensureDir(promptsDir)
+  await fs.ensureDir(scriptsDir)
 
   // Get template source directory (relative to this package)
   const templateDir = join(PACKAGE_ROOT, 'templates')
@@ -754,23 +746,41 @@ ${workflow.description}
   const skillsDestDir = join(installDir, 'skills')
   if (await fs.pathExists(skillsTemplateDir)) {
     try {
-      const skillDirs = await fs.readdir(skillsTemplateDir)
-      for (const skillName of skillDirs) {
-        const srcSkillDir = join(skillsTemplateDir, skillName)
-        const destSkillDir = join(skillsDestDir, skillName)
-        const stat = await fs.stat(srcSkillDir)
-        if (stat.isDirectory()) {
-          await fs.ensureDir(destSkillDir)
-          const files = await fs.readdir(srcSkillDir)
-          for (const file of files) {
-            const srcFile = join(srcSkillDir, file)
-            const destFile = join(destSkillDir, file)
-            if (force || !(await fs.pathExists(destFile))) {
-              const templateContent = await fs.readFile(srcFile, 'utf-8')
+      const copySkillDir = async (srcDir: string, destDir: string) => {
+        await fs.ensureDir(destDir)
+        const entries = await fs.readdir(srcDir, { withFileTypes: true })
+        for (const entry of entries) {
+          if (entry.name === '__pycache__' || entry.name.endsWith('.pyc')) {
+            continue
+          }
+
+          const srcPath = join(srcDir, entry.name)
+          const destPath = join(destDir, entry.name)
+          if (entry.isDirectory()) {
+            await copySkillDir(srcPath, destPath)
+          }
+          else if (force || !(await fs.pathExists(destPath))) {
+            if (entry.name.endsWith('.md')) {
+              const templateContent = await fs.readFile(srcPath, 'utf-8')
               const processedContent = replaceHomePathsInTemplate(templateContent, installDir)
-              await fs.writeFile(destFile, processedContent, 'utf-8')
+              await fs.writeFile(destPath, processedContent, 'utf-8')
+            }
+            else if (entry.name.endsWith('.sh') || entry.name.endsWith('.py')) {
+              const scriptContent = (await fs.readFile(srcPath, 'utf-8')).replace(/\r\n/g, '\n')
+              await fs.writeFile(destPath, scriptContent, 'utf-8')
+            }
+            else {
+              await fs.copy(srcPath, destPath)
             }
           }
+        }
+      }
+
+      const skillDirs = await fs.readdir(skillsTemplateDir, { withFileTypes: true })
+      for (const skillDir of skillDirs) {
+        if (skillDir.isDirectory()) {
+          await copySkillDir(join(skillsTemplateDir, skillDir.name), join(skillsDestDir, skillDir.name))
+          result.installedSkills.push(skillDir.name)
         }
       }
     }
@@ -780,76 +790,37 @@ ${workflow.description}
     }
   }
 
-  // Install codeagent-wrapper binary
+  // Install runtime scripts for command / skill execution outside plugin cache
   try {
-    const binDir = join(installDir, 'bin')
-    await fs.ensureDir(binDir)
+    const scriptsTemplateDir = join(templateDir, 'plugin', 'scripts')
+    if (await fs.pathExists(scriptsTemplateDir)) {
+      const copyRuntimeScripts = async (srcDir: string, destDir: string) => {
+        await fs.ensureDir(destDir)
+        const entries = await fs.readdir(srcDir, { withFileTypes: true })
+        for (const entry of entries) {
+          if (entry.name === '__pycache__') {
+            continue
+          }
 
-    // Detect platform and select appropriate binary
-    const platform = process.platform
-    const arch = process.arch
-    let binaryName: string
+          const srcPath = join(srcDir, entry.name)
+          const destPath = join(destDir, entry.name)
+          if (entry.isDirectory()) {
+            await copyRuntimeScripts(srcPath, destPath)
+            continue
+          }
 
-    if (platform === 'darwin') {
-      binaryName = arch === 'arm64' ? 'codeagent-wrapper-darwin-arm64' : 'codeagent-wrapper-darwin-amd64'
-    }
-    else if (platform === 'linux') {
-      binaryName = arch === 'arm64' ? 'codeagent-wrapper-linux-arm64' : 'codeagent-wrapper-linux-amd64'
-    }
-    else if (platform === 'win32') {
-      binaryName = arch === 'arm64' ? 'codeagent-wrapper-windows-arm64.exe' : 'codeagent-wrapper-windows-amd64.exe'
-    }
-    else {
-      result.errors.push(`Unsupported platform: ${platform}`)
-      result.success = false
-      result.configPath = commandsDir
-      return result
-    }
-
-    const srcBinary = join(PACKAGE_ROOT, 'bin', binaryName)
-    const destBinary = join(binDir, platform === 'win32' ? 'codeagent-wrapper.exe' : 'codeagent-wrapper')
-
-    if (await fs.pathExists(srcBinary)) {
-      await fs.copy(srcBinary, destBinary)
-      // Set executable permission on Unix-like systems
-      if (platform !== 'win32') {
-        await fs.chmod(destBinary, 0o755)
-      }
-
-      // Verify installation by running --version
-      try {
-        const { execSync } = await import('node:child_process')
-        execSync(`"${destBinary}" --version`, { stdio: 'pipe' })
-        result.binPath = binDir
-        result.binInstalled = true
-      }
-      catch (verifyError) {
-        result.errors.push(`Binary verification failed: ${verifyError}`)
-        result.success = false
-      }
-
-      // Install codeagent-persist.sh wrapper (tees output to persistent file)
-      try {
-        const persistSrc = join(PACKAGE_ROOT, 'templates', 'bin', 'codeagent-persist.sh')
-        const persistDest = join(binDir, 'codeagent-persist.sh')
-        if (await fs.pathExists(persistSrc)) {
-          await fs.copy(persistSrc, persistDest)
-          if (platform !== 'win32') {
-            await fs.chmod(persistDest, 0o755)
+          if (force || !(await fs.pathExists(destPath))) {
+            const scriptContent = (await fs.readFile(srcPath, 'utf-8')).replace(/\r\n/g, '\n')
+            await fs.writeFile(destPath, scriptContent, 'utf-8')
           }
         }
       }
-      catch {
-        // Non-fatal: persist wrapper is optional
-      }
-    }
-    else {
-      result.errors.push(`Binary not found in package: ${binaryName}`)
-      result.success = false
+
+      await copyRuntimeScripts(scriptsTemplateDir, scriptsDir)
     }
   }
   catch (error) {
-    result.errors.push(`Failed to install codeagent-wrapper: ${error}`)
+    result.errors.push(`Failed to install runtime scripts: ${error}`)
     result.success = false
   }
 
@@ -869,7 +840,6 @@ export interface UninstallResult {
   removedPrompts: string[]
   removedAgents: string[]
   removedSkills: string[]
-  removedBin: boolean
   errors: string[]
 }
 
@@ -883,15 +853,12 @@ export async function uninstallWorkflows(installDir: string): Promise<UninstallR
     removedPrompts: [],
     removedAgents: [],
     removedSkills: [],
-    removedBin: false,
     errors: [],
   }
 
   const commandsDir = join(installDir, 'commands', 'ccg')
-  const promptsDir = join(installDir, '.ccg', 'prompts')
   const agentsDir = join(installDir, 'agents', 'ccg')
-  const skillsDir = join(installDir, 'skills', 'multi-model-collaboration')
-  const binDir = join(installDir, 'bin')
+  const skillsDir = join(installDir, 'skills')
   const ccgConfigDir = join(installDir, '.ccg')
 
   // Remove CCG commands directory
@@ -935,33 +902,16 @@ export async function uninstallWorkflows(installDir: string): Promise<UninstallR
   // Remove CCG skills directory
   if (await fs.pathExists(skillsDir)) {
     try {
-      const files = await fs.readdir(skillsDir)
+      const files = await fs.readdir(skillsDir, { withFileTypes: true })
       for (const file of files) {
-        result.removedSkills.push(file)
+        if (file.isDirectory()) {
+          result.removedSkills.push(file.name)
+        }
       }
-      // Try to remove parent skills directory if it's the only skill
       await fs.remove(skillsDir)
     }
     catch (error) {
       result.errors.push(`Failed to remove skills: ${error}`)
-      result.success = false
-    }
-  }
-
-  // Remove CCG prompts directory (in .ccg/) - handled by removing .ccg dir below
-
-  // Remove codeagent-wrapper binary
-  if (await fs.pathExists(binDir)) {
-    try {
-      const wrapperName = process.platform === 'win32' ? 'codeagent-wrapper.exe' : 'codeagent-wrapper'
-      const wrapperPath = join(binDir, wrapperName)
-      if (await fs.pathExists(wrapperPath)) {
-        await fs.remove(wrapperPath)
-        result.removedBin = true
-      }
-    }
-    catch (error) {
-      result.errors.push(`Failed to remove binary: ${error}`)
       result.success = false
     }
   }

@@ -1,5 +1,5 @@
 #!/bin/bash
-# CCG Manage: PreToolUse hook for Task tool
+# CCG Manage: PreToolUse hook for Task / Agent tools
 # Injects current manage session progress state before spawning/waiting subagents
 # Conditional: only fires when an active manage session exists
 # Always exits 0 — stdout feeds into Claude's context

@@ -65,12 +65,20 @@ description: '需求 → 约束集（并行探索 + OPSX 提案）'
    }
    ```
 
+   **环境准备**（每次会话首次调用前执行一次）：
+   ```
+   Bash({
+     command: "P=\"$HOME/.claude/plugins/cache/ccg-plugin/ccg\"; R=$(ls -1d \"$P\"/*/ 2>/dev/null | sort -V | tail -1 | sed 's|/$||'); B=\"$R/scripts/codex_bridge.py\"; echo \"PLUGIN_ROOT=$R\"; python --version 2>&1; [ -f \"$B\" ] && echo \"BRIDGE=$B\" && echo 'OK' || echo 'BRIDGE MISSING'",
+     description: "解析 codex_bridge.py 路径"
+   })
+   ```
+
    **Step 4.1**: In ONE message, make TWO parallel Bash calls:
 
    **FIRST Bash call (Codex-A — backend boundaries)**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"{{WORKDIR}}\" <<'EOF'\nExplore backend context boundaries for <change description>:\n- Existing structures and patterns\n- Conventions in use\n- Hard constraints limiting solution space\n- Dependencies and risks\nOUTPUT: JSON using the output template above\nEOF",
+     command: "python \"<BRIDGE>\" --cd \"{{WORKDIR}}\" --sandbox read-only --PROMPT 'Explore backend context boundaries for <change description>:\n- Existing structures and patterns\n- Conventions in use\n- Hard constraints limiting solution space\n- Dependencies and risks\nOUTPUT: JSON using the output template above'",
      run_in_background: true,
      timeout: 300000,
      description: "Codex-A: backend boundary exploration"
@@ -80,7 +88,7 @@ description: '需求 → 约束集（并行探索 + OPSX 提案）'
    **SECOND Bash call (Codex-B — frontend boundaries) - IN THE SAME MESSAGE**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"{{WORKDIR}}\" <<'EOF'\nExplore frontend context boundaries for <change description>:\n- Existing structures and patterns\n- Conventions in use\n- Hard constraints limiting solution space\n- Dependencies and risks\nOUTPUT: JSON using the output template above\nEOF",
+     command: "python \"<BRIDGE>\" --cd \"{{WORKDIR}}\" --sandbox read-only --PROMPT 'Explore frontend context boundaries for <change description>:\n- Existing structures and patterns\n- Conventions in use\n- Hard constraints limiting solution space\n- Dependencies and risks\nOUTPUT: JSON using the output template above'",
      run_in_background: true,
      timeout: 300000,
      description: "Codex-B: frontend boundary exploration"

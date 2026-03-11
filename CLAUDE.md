@@ -1,6 +1,6 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-11 (v1.7.79)
+**Last Updated**: 2026-03-11 (v1.7.80)
 
 ---
 
@@ -13,6 +13,12 @@
 - Agent 调用模板新增 name + team_name 参数，第 4 步新增消息处理指令
 - execute-worker 模型选择从文件数量判断重写为 Codex/Claude 能力导向多维判断
 - worker prompt recipient 修复：`"lead"` → `"team-lead"`（经实际 teammate 测试验证）
+
+### 2026-03-11 (v1.7.80 - wrapper-free runtime + Gemini bridge 恢复)
+- 运行时主链切换为 `codex_bridge.py + codex-runtime Skill`，移除 `codeagent-wrapper` 二进制依赖
+- `codex_bridge.py` 恢复多后端执行，支持 `codex` / `gemini` / `claude`
+- `codex-runtime` Skill runner 改为多后端，默认仍走 Codex，Gemini 链路保留
+- 共享调用规范改为通过 `CCG_BACKEND` 解析 prompts 路径，避免配置层和运行时脱节
 
 ### 2026-03-10 (v1.7.78 - manage SubAgent 文件指向派发)
 - manage.md SubAgent 派发从 4 步简化为 3 步，子Agent 自行读取 prompt 文件
@@ -76,7 +82,7 @@
 
 ### 2026-02-25 (架构扫描更新)
 - 全仓重新扫描，更新文件统计与模块覆盖率
-- 新增模块级 CLAUDE.md：`codeagent-wrapper/CLAUDE.md`、`src/CLAUDE.md`、`templates/CLAUDE.md`
+- 新增模块级 CLAUDE.md：`src/CLAUDE.md`、`templates/CLAUDE.md`
 - 更新专家提示词统计：12 -> 19 个（Codex 6 + Gemini 7 + Claude 6）
 - 更新命令模板统计：25 -> 26 个（含 enhance）
 - 新增 `.claude/index.json` 覆盖率报告与缺口分析
@@ -109,7 +115,7 @@
 
 ## 项目愿景
 
-**CCG (Claude + Codex)** 是一个多模型协作开发系统，以 Claude Code 为编排中心，通过 Codex 双视角（逻辑 + 架构）实现多模型协作的最佳开发体验。以 Claude Code Plugin 形式分发，用户通过 `/install-plugin` 一键安装 27 个斜杠命令 + 19 个专家提示词，即可使用 `/ccg:xxx` 命令。
+**CCG (Claude + Codex)** 是一个多模型协作开发系统，以 Claude Code 为编排中心，通过 Codex 双视角（逻辑 + 架构）实现多模型协作的最佳开发体验。运行时默认走 Codex，同时保留 Gemini 作为可切换后端链路。以 Claude Code Plugin 形式分发，用户通过 `/install-plugin` 一键安装 27 个斜杠命令 + 19 个专家提示词，即可使用 `/ccg:xxx` 命令。
 
 ---
 
@@ -123,18 +129,22 @@ graph TD
     Init --> Commands["commands/<br/>27 个命令"]
     Init --> Agents["agents/<br/>5 个子智能体"]
     Init --> Prompts["prompts/<br/>19 个专家提示词"]
-    Init --> Binary["bin/<br/>codeagent-wrapper"]
+    Init --> Runtime["scripts + skills<br/>wrapper-free runtime"]
 
     User2["Claude Code 用户"] --> SlashCmd["/ccg:workflow<br/>/ccg:frontend<br/>..."]
     SlashCmd --> Commands
 
-    Commands --> Wrapper["codeagent-wrapper<br/>(Go v5.7.2)"]
-    Wrapper --> Codex["Codex CLI<br/>(后端)"]
-    Wrapper --> Codex2["Codex CLI<br/>(前端)"]
-    Wrapper --> Claude2["Claude CLI<br/>(编排)"]
+    Commands --> Bridge["codex_bridge.py<br/>(multi-backend bridge)"]
+    Commands --> Skill["codex-runtime<br/>(Skill + script)"]
+    Bridge --> Codex["Codex CLI<br/>(默认后端)"]
+    Bridge --> Gemini["Gemini CLI<br/>(保留可切换链路)"]
+    Skill --> Codex2["Codex CLI<br/>(默认执行)"]
+    Skill --> Gemini2["Gemini CLI<br/>(按需切换)"]
+    Skill --> Claude2["Claude CLI<br/>(兼容链路)"]
 
     style CLI fill:#90EE90
-    style Wrapper fill:#87CEEB
+    style Bridge fill:#87CEEB
+    style Skill fill:#87CEEB
 ```
 
 ---
@@ -143,10 +153,10 @@ graph TD
 
 ```mermaid
 graph TD
-    A["(根) ccg-workflow<br/>v1.7.68"] --> B["src/<br/>TypeScript CLI"]
-    A --> C["codeagent-wrapper/<br/>Go 多后端调用"]
+    A["(根) ccg-workflow<br/>v1.7.80"] --> B["src/<br/>TypeScript CLI"]
+    A --> C["templates/skills/<br/>运行时 Skill"]
     A --> D["templates/<br/>命令 + 提示词"]
-    A --> E["bin/<br/>预编译产物"]
+    A --> E["templates/plugin/scripts/<br/>运行时脚本"]
 
     B --> B1["commands/<br/>5 个 CLI 命令"]
     B --> B2["utils/<br/>6 个工具模块"]
@@ -156,10 +166,9 @@ graph TD
     D --> D1["commands/<br/>26 模板 + 5 agents"]
     D --> D2["prompts/<br/>19 专家提示词"]
     D --> D3["output-styles/<br/>5 输出风格"]
-    D --> D4["bin/<br/>persist 脚本"]
+    D --> D4["skills/<br/>Skill + script"]
 
     click B "./src/CLAUDE.md" "查看 CLI 模块文档"
-    click C "./codeagent-wrapper/CLAUDE.md" "查看 codeagent-wrapper 模块文档"
     click D "./templates/CLAUDE.md" "查看 templates 模块文档"
 ```
 
@@ -170,9 +179,9 @@ graph TD
 | 模块 | 路径 | 语言 | 职责 | 文档 |
 |------|------|------|------|------|
 | CLI Tool | `src/` | TypeScript | 交互式安装/配置/更新/诊断 | [src/CLAUDE.md](./src/CLAUDE.md) |
-| codeagent-wrapper | `codeagent-wrapper/` | Go | 多后端调用工具（codex/gemini/claude） | [codeagent-wrapper/CLAUDE.md](./codeagent-wrapper/CLAUDE.md) |
-| Templates | `templates/` | Markdown | 26 命令模板 + 19 专家提示词 + 5 输出风格 | [templates/CLAUDE.md](./templates/CLAUDE.md) |
-| Precompiled Binaries | `bin/` | Binary | 6 平台预编译 + 1 入口脚本 | (二进制，无文档) |
+| Runtime Skills | `templates/skills/` | Markdown + Script | 无二进制 Codex 运行时承接 | (随 templates 安装) |
+| Templates | `templates/` | Markdown | 26 命令模板 + 19 专家提示词 + 5 输出风格 + Skills | [templates/CLAUDE.md](./templates/CLAUDE.md) |
+| Runtime Scripts | `templates/plugin/scripts/` | Python + Bash | bridge / prompt 组装 / hooks | [templates/CLAUDE.md](./templates/CLAUDE.md) |
 
 ---
 
@@ -210,16 +219,11 @@ pnpm lint:fix
 pnpm build
 ```
 
-### Go 模块
+### Runtime Skill / Script
 
 ```bash
-cd codeagent-wrapper
-
-# 运行测试
-go test ./...
-
-# 跨平台编译
-bash build-all.sh
+python ~/.claude/skills/codex-runtime/scripts/ccg-codex-run.py --help
+python ~/.claude/.ccg/scripts/codex_bridge.py --help
 ```
 
 ---
@@ -295,7 +299,7 @@ v1.7.0 起，以下配置不再支持自定义：
 |------|--------|------|
 | 语言 | 中文 | 所有模板为中文 |
 | 前端模型 | Codex | 双 Codex 架构 |
-| 后端模型 | Codex（默认），可通过 CCG_BACKEND=claude 切换 | 擅长逻辑/算法/调试 |
+| 后端模型 | Codex（默认），可通过 `CCG_BACKEND=gemini` 或 `CCG_BACKEND=claude` 切换 | 默认保持 Codex，Gemini 链路保留 |
 | 协作模式 | smart | 最佳实践 |
 | 命令数量 | 27 个 | 全部安装 |
 
@@ -305,7 +309,7 @@ v1.7.0 起，以下配置不再支持自定义：
 
 | 模块 | 测试情况 |
 |------|----------|
-| `codeagent-wrapper/` (Go) | 16 个测试文件，覆盖核心逻辑、并发、压力测试、基准测试 |
+| `templates/skills/codex-runtime/` | Skill 文档 + 持久化 runner 脚本，覆盖 Codex/Gemini/Claude 无二进制运行时链路 |
 | `src/` (TypeScript) | 46 个测试（34 单元 + 12 E2E），vitest |
 | `templates/` (Markdown) | 无自动化测试；通过安装流程间接验证 |
 
@@ -371,23 +375,6 @@ src/
     +-- cli.ts                 # CLI 类型
 ```
 
-### Go 模块
-
-```
-codeagent-wrapper/
-+-- main.go                    # 入口
-+-- config.go                  # 配置解析
-+-- backend.go                 # 后端接口
-+-- executor.go                # 执行引擎
-+-- parser.go                  # JSON Stream 解析
-+-- logger.go                  # 日志系统
-+-- server.go                  # SSE WebServer
-+-- filter.go                  # stderr 过滤
-+-- utils.go                   # 工具函数
-+-- persist.go                 # 输出持久化
-+-- ... (16 test files)
-```
-
 ### 模板文件
 
 ```
@@ -398,20 +385,8 @@ templates/
 +-- prompts/gemini/            # 7 个 Gemini 提示词
 +-- prompts/claude/            # 6 个 Claude 提示词
 +-- output-styles/             # 5 个输出风格
-+-- bin/codeagent-persist.sh   # 持久化脚本
-```
-
-### 预编译产物
-
-```
-bin/
-+-- ccg.mjs                           # CLI 入口脚本
-+-- codeagent-wrapper-darwin-amd64     # macOS Intel
-+-- codeagent-wrapper-darwin-arm64     # macOS Apple Silicon
-+-- codeagent-wrapper-linux-amd64      # Linux x64
-+-- codeagent-wrapper-linux-arm64      # Linux ARM64
-+-- codeagent-wrapper-windows-amd64.exe # Windows x64
-+-- codeagent-wrapper-windows-arm64.exe # Windows ARM64
++-- skills/codex-runtime/      # wrapper-free runtime Skill
++-- plugin/scripts/            # bridge + assemble + hooks
 ```
 
 ---

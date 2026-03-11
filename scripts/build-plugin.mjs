@@ -6,16 +6,15 @@
  *   node scripts/build-plugin.mjs [--out-dir <path>] [--verbose]
  *
  * 转换规则：
- *   1. templates/commands/*.md → dist/plugin/skills/<name>/SKILL.md
+ *   1. templates/commands/*.md → dist/plugin/commands/<name>.md
  *   2. templates/commands/agents/*.md → dist/plugin/agents/*.md
  *   3. templates/prompts/ → dist/plugin/prompts/ (直接复制)
  *   4. templates/output-styles/ → dist/plugin/output-styles/ (直接复制)
- *   5. bin/codeagent-wrapper-* → dist/plugin/bin/ (全平台二进制)
- *   6. templates/bin/run-wrapper → dist/plugin/bin/run-wrapper
- *   7. templates/shared/ → dist/plugin/shared/ (变量替换 + 路径替换)
- *   8. templates/plugin/plugin.json → dist/plugin/.claude-plugin/plugin.json (注入版本号)
- *   9. templates/plugin/.mcp.json → dist/plugin/.mcp.json
- *  10. templates/plugin/hooks/ → dist/plugin/hooks/
+ *   5. templates/shared/ → dist/plugin/shared/ (变量替换 + 路径替换)
+ *   6. templates/plugin/plugin.json → dist/plugin/.claude-plugin/plugin.json (注入版本号)
+ *   7. templates/plugin/.mcp.json → dist/plugin/.mcp.json
+ *   8. templates/plugin/hooks/ → dist/plugin/hooks/
+ *   9. templates/plugin/scripts/ → dist/plugin/scripts/ (codex_bridge.py 等)
  */
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
@@ -32,14 +31,14 @@ const AGENTS_DIR = path.join(COMMANDS_DIR, 'agents')
 const PROMPTS_DIR = path.join(TEMPLATES_DIR, 'prompts')
 const OUTPUT_STYLES_DIR = path.join(TEMPLATES_DIR, 'output-styles')
 const PLUGIN_TEMPLATE_DIR = path.join(TEMPLATES_DIR, 'plugin')
-const BIN_DIR = path.join(ROOT, 'bin')
+const SKILLS_DIR = path.join(TEMPLATES_DIR, 'skills')
 
 // 默认输出
 const DEFAULT_OUT_DIR = path.join(ROOT, 'dist', 'plugin')
 
 // 模板变量 → 硬编码默认值
 const INSTALL_VAR_RULES = [
-  { pattern: /\{\{LITE_MODE_FLAG\}\}/g, replacement: '--lite ' },
+  { pattern: /\{\{LITE_MODE_FLAG\}\}/g, replacement: '' },
   { pattern: /\{\{MCP_SEARCH_TOOL\}\}/g, replacement: 'mcp__fast-context__fast_context_search' },
   { pattern: /\{\{MCP_SEARCH_PARAM\}\}/g, replacement: 'query' },
   { pattern: /\{\{MCP_PATH_PARAM\}\}/g, replacement: 'project_path' },
@@ -53,22 +52,17 @@ const INSTALL_VAR_RULES = [
 
 // 路径替换规则（优先级从高到低，长匹配优先）
 const PATH_RULES = [
-  // codeagent-persist.sh → run-wrapper
-  { pattern: /~\/\.claude\/bin\/codeagent-persist\.sh/g, replacement: '$CLAUDE_PLUGIN_ROOT/bin/run-wrapper' },
-  // codeagent-wrapper → run-wrapper
-  { pattern: /~\/\.claude\/bin\/codeagent-wrapper(?:\.exe)?/g, replacement: '$CLAUDE_PLUGIN_ROOT/bin/run-wrapper' },
   // prompts 目录
   { pattern: /~\/\.claude\/\.ccg\/prompts\//g, replacement: '$CLAUDE_PLUGIN_ROOT/prompts/' },
   { pattern: /~\/\.claude\/\.ccg\/prompts\b/g, replacement: '$CLAUDE_PLUGIN_ROOT/prompts' },
   // shared 目录
   { pattern: /~\/\.claude\/\.ccg\/shared\//g, replacement: '$CLAUDE_PLUGIN_ROOT/shared/' },
   { pattern: /~\/\.claude\/\.ccg\/shared\b/g, replacement: '$CLAUDE_PLUGIN_ROOT/shared' },
-  // agents 目录
+  // scripts 目录（codex_bridge.py 等）
+  { pattern: /~\/\.claude\/\.ccg\/scripts\//g, replacement: '$CLAUDE_PLUGIN_ROOT/scripts/' },
+  { pattern: /~\/\.claude\/\.ccg\/scripts\b/g, replacement: '$CLAUDE_PLUGIN_ROOT/scripts' },
+  // agents 目录（Claude Code 插件系统从 cache 加载，此路径仅用于文档引用）
   { pattern: /~\/\.claude\/agents\/ccg\//g, replacement: '$CLAUDE_PLUGIN_ROOT/agents/' },
-  // bin 目录
-  { pattern: /~\/\.claude\/bin\//g, replacement: '$CLAUDE_PLUGIN_ROOT/bin/' },
-  // 裸 codeagent-wrapper 命令调用（如 spec-impl.md 中的）
-  { pattern: /(?<=\s)codeagent-wrapper\s+--backend/g, replacement: '$CLAUDE_PLUGIN_ROOT/bin/run-wrapper --backend' },
 ]
 
 // 构建后禁止出现的 token
@@ -81,26 +75,21 @@ const FORBIDDEN_TOKENS = [
   '{{BACKEND_MODELS}}',
   '{{REVIEW_MODELS}}',
   '{{ROUTING_MODE}}',
-  '~/.claude/bin/codeagent-wrapper',
   '~/.claude/.ccg/prompts',
   '~/.claude/.ccg/shared',
+  '~/.claude/.ccg/scripts',
   'codeagent-persist.sh',
-]
-
-// 6 平台二进制
-const BINARY_NAMES = [
-  'codeagent-wrapper-darwin-amd64',
-  'codeagent-wrapper-darwin-arm64',
-  'codeagent-wrapper-linux-amd64',
-  'codeagent-wrapper-linux-arm64',
-  'codeagent-wrapper-windows-amd64.exe',
-  'codeagent-wrapper-windows-arm64.exe',
+  'codeagent-wrapper',
 ]
 
 // CLI 参数
 const args = process.argv.slice(2)
 const outDir = resolveOutDir(args)
 const verbose = args.includes('--verbose')
+
+function shouldSkipEntry(name) {
+  return name === '__pycache__' || name.endsWith('.pyc')
+}
 
 async function main() {
   log(`构建输出: ${outDir}`)
@@ -109,7 +98,7 @@ async function main() {
   await fs.rm(outDir, { recursive: true, force: true })
 
   // 2. 创建目录结构
-  for (const dir of ['.claude-plugin', 'commands', 'agents', 'prompts', 'output-styles', 'bin', 'hooks', 'scripts', 'shared']) {
+  for (const dir of ['.claude-plugin', 'commands', 'agents', 'prompts', 'output-styles', 'hooks', 'scripts', 'shared', 'skills']) {
     await fs.mkdir(path.join(outDir, dir), { recursive: true })
   }
 
@@ -125,16 +114,10 @@ async function main() {
   // 6. 复制 output-styles
   await copyDir(OUTPUT_STYLES_DIR, path.join(outDir, 'output-styles'))
 
-  // 7. 复制二进制
-  await copyBinaries(outDir)
-
-  // 8. 复制 run-wrapper
-  await copyRunWrapper(outDir)
-
-  // 9. 写入 plugin 配置
+  // 7. 写入 plugin 配置
   await writePluginConfigs(outDir)
 
-  // 10. 复制 shared（多模型调用规范、共享工作流、子Agent prompts）
+  // 8. 复制 shared（多模型调用规范、共享工作流、子Agent prompts）
   const sharedDir = path.join(TEMPLATES_DIR, 'shared')
   try {
     await copyDirWithTransform(sharedDir, path.join(outDir, 'shared'))
@@ -144,10 +127,10 @@ async function main() {
     log(`  shared: 目录不存在，跳过`)
   }
 
-  // 11. 复制 hooks
+  // 9. 复制 hooks
   await copyDir(path.join(PLUGIN_TEMPLATE_DIR, 'hooks'), path.join(outDir, 'hooks'))
 
-  // 12. 复制 scripts（manage 钩子等），强制 LF 行尾
+  // 10. 复制 scripts（codex_bridge.py + manage 钩子等），强制 LF 行尾
   const scriptsDir = path.join(PLUGIN_TEMPLATE_DIR, 'scripts')
   try {
     await copyDirWithLF(scriptsDir, path.join(outDir, 'scripts'))
@@ -157,7 +140,16 @@ async function main() {
     log(`  scripts: 目录不存在，跳过`)
   }
 
-  // 13. 验证输出
+  // 11. 复制 skills
+  try {
+    await copyDirWithTransform(SKILLS_DIR, path.join(outDir, 'skills'))
+    log(`  skills: templates/skills/ → skills/`)
+  }
+  catch {
+    log(`  skills: 目录不存在，跳过`)
+  }
+
+  // 12. 验证输出
   const warnings = await validateOutput(outDir)
 
   console.log(`[build-plugin] 完成: ${cmdCount} commands, ${agentCount} agents`)
@@ -230,39 +222,6 @@ async function buildAgents(dir) {
 }
 
 /**
- * 复制 6 平台二进制到 bin/
- */
-async function copyBinaries(dir) {
-  for (const name of BINARY_NAMES) {
-    const src = path.join(BIN_DIR, name)
-    const dst = path.join(dir, 'bin', name)
-    try {
-      await fs.copyFile(src, dst)
-      if (!name.endsWith('.exe')) {
-        await fs.chmod(dst, 0o755).catch(() => {})
-      }
-      log(`  binary: ${name}`)
-    }
-    catch (err) {
-      throw new Error(`二进制缺失 ${name}: ${err.message}`)
-    }
-  }
-}
-
-/**
- * 复制 run-wrapper 脚本
- */
-async function copyRunWrapper(dir) {
-  const src = path.join(TEMPLATES_DIR, 'bin', 'run-wrapper')
-  const dst = path.join(dir, 'bin', 'run-wrapper')
-  // 强制 LF 行尾（shell 脚本在 Windows 上 checkout 可能变成 CRLF）
-  const content = (await fs.readFile(src, 'utf-8')).replace(/\r\n/g, '\n')
-  await fs.writeFile(dst, content, 'utf-8')
-  await fs.chmod(dst, 0o755).catch(() => {})
-  log(`  binary: run-wrapper (LF enforced)`)
-}
-
-/**
  * 写入 plugin.json（同步版本号）和 .mcp.json
  */
 async function writePluginConfigs(dir) {
@@ -301,7 +260,8 @@ async function writePluginConfigs(dir) {
 async function validateOutput(dir) {
   const warnings = []
   const files = await listFiles(dir)
-  const mdFiles = files.filter(f => f.endsWith('.md') || f.endsWith('.json') || f.endsWith('run-wrapper'))
+  // 只验证模板文件（.md/.json），脚本文件（.sh/.py）合法包含这些模式作为替换规则
+  const mdFiles = files.filter(f => f.endsWith('.md') || f.endsWith('.json'))
 
   for (const file of mdFiles) {
     const content = await fs.readFile(file, 'utf-8')
@@ -328,7 +288,19 @@ function applyRules(content) {
 }
 
 async function copyDir(src, dst) {
-  await fs.cp(src, dst, { recursive: true })
+  await fs.mkdir(dst, { recursive: true })
+  const entries = await fs.readdir(src, { withFileTypes: true })
+  for (const entry of entries) {
+    if (shouldSkipEntry(entry.name)) continue
+    const srcPath = path.join(src, entry.name)
+    const dstPath = path.join(dst, entry.name)
+    if (entry.isDirectory()) {
+      await copyDir(srcPath, dstPath)
+    }
+    else {
+      await fs.copyFile(srcPath, dstPath)
+    }
+  }
 }
 
 /**
@@ -339,12 +311,13 @@ async function copyDirWithLF(src, dst) {
   await fs.mkdir(dst, { recursive: true })
   const entries = await fs.readdir(src, { withFileTypes: true })
   for (const entry of entries) {
+    if (shouldSkipEntry(entry.name)) continue
     const srcPath = path.join(src, entry.name)
     const dstPath = path.join(dst, entry.name)
     if (entry.isDirectory()) {
       await copyDirWithLF(srcPath, dstPath)
     }
-    else if (entry.name.endsWith('.sh') || entry.name === 'run-wrapper') {
+    else if (entry.name.endsWith('.sh') || entry.name.endsWith('.py') || entry.name === 'run-wrapper') {
       const content = (await fs.readFile(srcPath, 'utf-8')).replace(/\r\n/g, '\n')
       await fs.writeFile(dstPath, content, 'utf-8')
       await fs.chmod(dstPath, 0o755).catch(() => {})
@@ -362,6 +335,7 @@ async function copyDirWithTransform(src, dst) {
   await fs.mkdir(dst, { recursive: true })
   const entries = await fs.readdir(src, { withFileTypes: true })
   for (const entry of entries) {
+    if (shouldSkipEntry(entry.name)) continue
     const srcPath = path.join(src, entry.name)
     const dstPath = path.join(dst, entry.name)
     if (entry.isDirectory()) {

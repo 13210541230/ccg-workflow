@@ -25,8 +25,8 @@ description: '多模型代码审查：无参数时自动审查 git diff，双模
 
 | 模型 | 提示词 |
 |------|--------|
-| Codex-A | `~/.claude/.ccg/prompts//reviewer.md` |
-| Codex-B | `~/.claude/.ccg/prompts//reviewer.md` |
+| Codex-A | `~/.claude/.ccg/prompts/codex/reviewer.md` |
+| Codex-B | `~/.claude/.ccg/prompts/codex/reviewer.md` |
 
 ---
 

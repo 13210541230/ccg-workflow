@@ -35,14 +35,20 @@ description: '按规范执行 + 多模型协作 + 归档'
 
    **工作目录**：`{{WORKDIR}}` 替换为目标工作目录的绝对路径。如果用户通过 `/add-dir` 添加了多个工作区，先确定任务相关的工作区。
 
+   **环境准备**（每次会话首次调用前执行一次）：
+   ```
+   Bash({
+     command: "P=\"$HOME/.claude/plugins/cache/ccg-plugin/ccg\"; R=$(ls -1d \"$P\"/*/ 2>/dev/null | sort -V | tail -1 | sed 's|/$||'); B=\"$R/scripts/codex_bridge.py\"; echo \"PLUGIN_ROOT=$R\"; python --version 2>&1; [ -f \"$B\" ] && echo \"BRIDGE=$B\" && echo 'OK' || echo 'BRIDGE MISSING'",
+     description: "解析 codex_bridge.py 路径"
+   })
+   ```
+
    For each task:
    ```
-   codeagent-wrapper --backend ${CCG_BACKEND:-codex} - "{{WORKDIR}}" <<'EOF'
-   TASK: <task description from tasks.md>
+   python "<BRIDGE>" --cd "{{WORKDIR}}" --role "<PLUGIN_ROOT>/prompts/codex/architect.md" --sandbox read-only --PROMPT 'TASK: <task description from tasks.md>
    CONTEXT: <relevant code context>
    CONSTRAINTS: <constraints from spec>
-   OUTPUT: Unified Diff Patch format ONLY
-   EOF
+   OUTPUT: Unified Diff Patch format ONLY'
    ```
 
 5. **Rewrite Prototype to Production Code**
@@ -71,7 +77,7 @@ description: '按规范执行 + 多模型协作 + 归档'
    **FIRST Bash call (Codex)**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --backend ${CCG_BACKEND:-codex} - \"{{WORKDIR}}\" <<'EOF'\nReview the implementation changes:\n- Correctness: logic errors, edge cases\n- Security: injection, auth issues\n- Spec compliance: constraints satisfied\nOUTPUT: JSON with findings\nEOF",
+     command: "python \"<BRIDGE>\" --cd \"{{WORKDIR}}\" --role \"<PLUGIN_ROOT>/prompts/codex/reviewer.md\" --sandbox read-only --PROMPT 'Review the implementation changes:\n- Correctness: logic errors, edge cases\n- Security: injection, auth issues\n- Spec compliance: constraints satisfied\nOUTPUT: JSON with findings'",
      run_in_background: true,
      timeout: 300000,
      description: "Codex: correctness/security review"
@@ -81,7 +87,7 @@ description: '按规范执行 + 多模型协作 + 归档'
    **SECOND Bash call (Codex) - IN THE SAME MESSAGE**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --backend ${CCG_BACKEND:-codex} - \"{{WORKDIR}}\" <<'EOF'\nReview the implementation changes:\n- Maintainability: readability, complexity\n- Patterns: consistency with project style\n- Integration: cross-module impacts\nOUTPUT: JSON with findings\nEOF",
+     command: "python \"<BRIDGE>\" --cd \"{{WORKDIR}}\" --role \"<PLUGIN_ROOT>/prompts/codex/reviewer.md\" --sandbox read-only --PROMPT 'Review the implementation changes:\n- Maintainability: readability, complexity\n- Patterns: consistency with project style\n- Integration: cross-module impacts\nOUTPUT: JSON with findings'",
      run_in_background: true,
      timeout: 300000,
      description: "Codex: maintainability/patterns review"
@@ -94,7 +100,7 @@ description: '按规范执行 + 多模型协作 + 归档'
    TaskOutput({ task_id: "<codex_task_id_2>", block: true, timeout: 600000 })
    ```
 
-   **Output loss detection** (⚠️ mandatory): If `TaskOutput` returns `exit_code: 0` but `<output>` is empty, use `Read` tool to read the output file (path from `Output is being written to:`, use Windows absolute path format). If temp file is gone, use `Glob` to find `~/.claude/.ccg/outputs/*.txt` and read the latest. If still missing, re-run with `resume`. NEVER skip empty output.
+   **Output loss detection** (⚠️ mandatory): If `TaskOutput` returns `exit_code: 0` but `<output>` is empty, use `Read` tool to read the output file (path from `Output is being written to:`, use Windows absolute path format). If temp file is gone, use `Glob` to find `~/.claude/.ccg/outputs/*.txt` and read the latest. If still missing, re-run with `--SESSION_ID` to reuse session. NEVER skip empty output.
 
    Address any critical findings before proceeding.
 

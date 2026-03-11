@@ -81,8 +81,7 @@ templates/
 |   +-- laowang-engineer.md
 |   +-- nekomata-engineer.md
 |   +-- ojousama-engineer.md
-+-- bin/                   # 1 个 shell 脚本 -> ~/.claude/bin/
-    +-- codeagent-persist.sh  # 输出持久化包装器
++-- skills/                # Codex runtime Skill
 ```
 
 ---

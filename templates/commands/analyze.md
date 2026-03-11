@@ -30,8 +30,8 @@ description: '多模型技术分析（并行执行）：Codex 双视角并行分
 
 | 模型 | 提示词 |
 |------|--------|
-| Codex (逻辑) | `~/.claude/.ccg/prompts//analyzer.md` |
-| Codex (架构) | `~/.claude/.ccg/prompts//analyzer.md` |
+| Codex (逻辑) | `~/.claude/.ccg/prompts/codex/analyzer.md` |
+| Codex (架构) | `~/.claude/.ccg/prompts/codex/analyzer.md` |
 
 ---
 
