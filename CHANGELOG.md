@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.1] - 2026-03-12
+
+### 🐛 修复
+
+- **`ccg-codex` 插件 MCP 连接修复**：`.mcp.json` 改为通过 `${CLAUDE_PLUGIN_ROOT}/start.mjs` 启动，修复插件环境下相对路径导致的启动失败
+- **MCP 运行时切换到成熟 Node SDK**：新增 `start.mjs + server.bundle.mjs`，由官方 MCP TypeScript SDK 处理 `initialize` / `tools/list` / `ping`，不再依赖手写 Python 握手协议
+- **Python helper 职责收口**：`ccg_codex_mcp.py` 改为工具执行 helper CLI，继续复用原有 Codex session / bridge 逻辑，但不再直接承担 MCP stdio server 角色
+
 ## [1.8.0] - 2026-03-12
 
 ### ✨ 新功能

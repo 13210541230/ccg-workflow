@@ -1,12 +1,17 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-12 (v1.8.0)
+**Last Updated**: 2026-03-12 (v1.8.1)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-12 (v1.8.1 - ccg-codex MCP runtime hardening)
+- `ccg-codex` 插件入口从直接执行 Python 脚本改为 `node start.mjs`，修复插件环境下相对路径和连接握手不稳定问题
+- 新增 Node `server.bundle.mjs`，使用官方 MCP TypeScript SDK 处理 `initialize`、`tools/list`、`ping`
+- `ccg_codex_mcp.py` 收口为 helper CLI，继续承接 Codex session / bridge 逻辑，不再直接暴露 MCP stdio server
 
 ### 2026-03-12 (v1.7.82 - manage routing hardening + worker reuse)
 - `/ccg:manage` 复杂任务默认先尝试 `TeamCreate`，复杂代码修改优先 `ccg:codex-collaborator`，避免错误落到 `general-purpose`

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import subprocess
@@ -518,7 +519,35 @@ def _error(message_id: Any, code: int, message: str) -> None:
     _write_message({"jsonrpc": "2.0", "id": message_id, "error": {"code": code, "message": message}})
 
 
-def main() -> int:
+def _run_cli_mode() -> int | None:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--tool")
+    parser.add_argument("--arguments-json")
+    parser.add_argument("--tool-definitions", action="store_true")
+    args, _unknown = parser.parse_known_args()
+
+    if not args.tool_definitions and not args.tool:
+        return None
+
+    try:
+        if args.tool_definitions:
+            payload: dict[str, Any] = {"success": True, "tools": _tool_definitions()}
+        else:
+            arguments = json.loads(args.arguments_json) if args.arguments_json else {}
+            if not isinstance(arguments, dict):
+                raise ValueError("arguments-json must decode to an object")
+            payload = _handle_tool(str(args.tool), arguments)
+            if "success" not in payload:
+                payload = {"success": True, **payload}
+    except Exception as error:
+        payload = {"success": False, "error": str(error)}
+
+    sys.stdout.write(json.dumps(payload, ensure_ascii=False))
+    sys.stdout.flush()
+    return 0
+
+
+def _serve_mcp() -> int:
     while True:
         message = _read_message()
         if message is None:
@@ -553,6 +582,13 @@ def main() -> int:
         except Exception as error:
             if message_id is not None:
                 _success(message_id, _tool_result({"success": False, "error": str(error)}, is_error=True))
+
+
+def main() -> int:
+    cli_result = _run_cli_mode()
+    if cli_result is not None:
+        return cli_result
+    return _serve_mcp()
 
 
 if __name__ == "__main__":

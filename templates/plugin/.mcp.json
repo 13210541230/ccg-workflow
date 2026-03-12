@@ -2,14 +2,10 @@
   "mcpServers": {
     "ccg-codex": {
       "type": "stdio",
-      "command": "python",
+      "command": "node",
       "args": [
-        "scripts/ccg_codex_mcp.py"
+        "${CLAUDE_PLUGIN_ROOT}/start.mjs"
       ],
-      "env": {
-        "PYTHONIOENCODING": "utf-8",
-        "PYTHONUNBUFFERED": "1"
-      },
       "startup_timeout_ms": 30000
     }
   }
