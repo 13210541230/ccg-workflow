@@ -1,5 +1,5 @@
 ---
-description: '主Agent调度模式：简单任务 Claude 直做，复杂任务通过 ccg-codex MCP 复用多角色 Codex 会话，sequential-thinking 分解 + planning-with-files 状态管理 + 迭代收敛'
+description: '主Agent调度模式：简单任务 Claude 直做；复杂任务通过 codex-* teammate subagent 协作，teammate 内部再复用 ccg-codex MCP 持久会话'
 ---
 
 # Manage - 主Agent调度模式
@@ -10,29 +10,44 @@ $ARGUMENTS
 
 ## 核心协议
 
-- **语言协议**：与用户交互用中文；与工具、Codex prompt、状态字段交互优先用英语
+- **语言协议**：与用户交互用中文；写给 Codex teammate / Codex session 的任务和状态字段优先用英语
 - **简单任务直做**：低复杂度任务由 Claude 直接分析、改码、测试、审查
-- **复杂任务走 Codex 会话层**：复杂分析、规划、实施、审查必须通过 `mcp__ccg-codex__codex_session_*` 调用角色化 Codex 会话
-- **工具优先**：禁止手工拼 `SESSION_ID`、手工写 `resume`、手工模拟持久对话
-- **角色分离**：复杂任务默认使用 `analyzer-a`、`analyzer-b`、`planner-a`、`planner-b`、`executor`、`reviewer-a`、`reviewer-b`
-- **自动流转**：除 Phase 2 计划确认外，各阶段完成后立即进入下一阶段
-- **状态驱动**：所有进度通过 `.claude/plan/<task-name>/` 下的状态文件和 artifacts 追踪
-- **禁止静默降级**：复杂任务一旦进入 Codex 路径，超时、空输出、MCP 失败只允许重试或升级，禁止偷偷改成 Claude 自己补完整复杂分析/规划/审查
-- **迭代优先复用**：测试失败或审查问题回流到 Phase 3 时，优先复用已有 `executor` 会话，禁止每轮重新开新会话吃全量上下文
+- **复杂任务走 teammate 层**：复杂分析、规划、实施、审查必须先派发给 `codex-* teammate` subagent，再由 teammate 内部调用 `ccg-codex` MCP
+- **禁止主 Agent 直派发 Codex 任务**：Lead 不直接对复杂角色调用 `mcp__ccg-codex__codex_session_send`
+- **两层连续性**：Lead 优先复用同一个 teammate agent；teammate agent 再优先复用同一个 Codex session
+- **角色分离**：复杂任务默认存在 `analyzer-a`、`analyzer-b`、`planner-a`、`planner-b`、`executor`、`reviewer-a`、`reviewer-b`
+- **禁止静默降级**：复杂任务一旦进入 teammate 路径，失败时只能重试、重建同角色 teammate、或升级给用户，不能偷偷改成 Claude 自己补完整复杂分析/规划/审查/实施
+- **执行优先复用**：测试失败或审查回流到实施阶段时，优先 `resume` 原 `codex-executor` teammate
 
 ---
 
 ## 你的角色
 
-你是**调度协调者**，职责：
+你是 **Claude Lead**，职责是：
 - 创建和维护 `.claude/plan/<task-name>/`
-- 用 `mcp__sequential-thinking__sequentialthinking` 分解任务
+- 用 `mcp__sequential-thinking__sequentialthinking` 拆解任务
 - 判断简单/复杂并选择执行路径
-- 复杂任务中通过 `ccg-codex` MCP 管理 Codex 会话
-- 维护会话注册表、消息文件、进度状态
-- 做最终决策：是否继续迭代、是否升级给用户、是否完成
+- 复杂任务中派发、复用、监督 `codex-* teammate` subagent
+- 汇总 teammate 产出，运行测试，做最终决策
+- 持续更新状态文件与注册表
 
-简单任务中你可以直接修改源码。复杂任务中你负责编排、验证、决策，复杂实施优先交给 Codex `executor` 会话。
+简单任务你可以直接修改源码。复杂任务里，你是编排者与审查者，不是复杂执行者。
+
+---
+
+## Codex Teammates
+
+复杂任务默认使用以下 subagent：
+
+| 角色 | Subagent Type | 职责 |
+|------|---------------|------|
+| `analyzer-*` | `ccg:codex-analyzer` | 复杂分析、可行性、架构/边界评估 |
+| `planner-*` | `ccg:codex-planner` | 实施计划、执行顺序、回滚点 |
+| `executor` | `ccg:codex-executor` | 实施、复杂修复、测试/审查回流修复 |
+| `reviewer-*` | `ccg:codex-reviewer` | 独立审查、回归风险、可维护性校验 |
+
+这些 teammate 不是 Codex 本体，而是 **Claude 可调度的长期代理**。  
+它们内部通过 `ccg-codex` MCP 维护自己的 `session_name / session_id`。
 
 ---
 
@@ -53,15 +68,15 @@ Bash({
 
 保存为 `PLUGIN_ROOT`。若未找到则终止。
 
-#### 0.1 验证 `ccg-codex` MCP 可用
+#### 0.1 运行时可用性检查
 
-复杂任务路径依赖内置 `ccg-codex` MCP。开始前至少验证一次：
+复杂任务开始前至少验证一次：
 
 ```
 mcp__ccg-codex__codex_session_list({})
 ```
 
-若当前会话不存在该 MCP 工具，则记录为 `runtime blocked` 并终止复杂任务路径；不要改成手工维护 Codex 会话。
+用途仅限运行时健康检查。若该工具不可用，则记录为 `runtime blocked` 并停止复杂路径。
 
 #### 0.2 会话恢复检测
 
@@ -69,24 +84,28 @@ mcp__ccg-codex__codex_session_list({})
 Glob({ pattern: ".claude/plan/*/progress.md" })
 ```
 
-若找到未完成会话（状态非 `complete`）→ 询问用户是否继续。
+若发现未完成会话（状态非 `complete`），询问用户是否继续。
 
 #### 0.3 Prompt 增强
 
-按 `/ccg:enhance` 的逻辑执行：分析意图、缺失信息、隐含假设，补全为结构化需求。
+按 `/ccg:enhance` 的逻辑整理结构化需求，形成：
+- 目标
+- 范围
+- 风险
+- 验收标准
 
-#### 0.4 Sequential-Thinking 任务分解
+#### 0.4 Sequential-Thinking 分解
 
 调用 5 轮 `mcp__sequential-thinking__sequentialthinking`：
 1. 梳理核心目标与子目标
 2. 分析依赖关系
-3. 识别技术约束和风险
+3. 识别技术约束与风险
 4. 确定实施顺序
 5. 输出结构化任务拆解
 
 #### 0.5 创建状态目录
 
-读取状态文件格式：
+先读取：
 
 ```
 Read({ file_path: "<PLUGIN_ROOT>/shared/manage-state-format.md" })
@@ -111,50 +130,35 @@ Read({ file_path: "<PLUGIN_ROOT>/shared/manage-state-format.md" })
 | 方案权衡 | 0-1 个 | 2+ 个 |
 | 风险等级 | 低 | 中/高 |
 
-全部满足简单条件 → 标记为 `simple`。命中任一复杂条件 → 标记为 `complex`。
+全部满足简单条件 → `simple`  
+命中任一复杂条件 → `complex`
 
-#### 0.7 复杂任务初始化 Codex Session Slots
+#### 0.7 复杂任务初始化 teammate 槽位
 
-仅复杂任务执行。为每个角色预创建命名会话槽位：
+仅复杂任务执行。初始化以下逻辑槽位并写入 `progress.md` / 注册表：
+- `analyzer-a`
+- `analyzer-b`
+- `planner-a`
+- `planner-b`
+- `executor`
+- `reviewer-a`
+- `reviewer-b`
 
-```
-mcp__ccg-codex__codex_session_ensure({
-  session_name: "<task-name>-analyzer-a",
-  workdir: "<WORKDIR>",
-  backend: "codex",
-  sandbox: "read-only",
-  role: "analyzer",
-  state_dir: "<PLAN_DIR>/codex-sessions",
-  summary: "Analyze-A session for <task-name>"
-})
-```
+此时先记录：
+- `session_name`
+- `teammate role`
+- `subagent_type`
+- `sandbox`
 
-同样方式按需或一次性创建：
-- `<task-name>-analyzer-b`
-- `<task-name>-planner-a`
-- `<task-name>-planner-b`
-- `<task-name>-executor`
-- `<task-name>-reviewer-a`
-- `<task-name>-reviewer-b`
-
-复杂任务的关键规则：
-- `executor` 使用 `workspace-write`
-- `analyzer-*` / `planner-*` / `reviewer-*` 使用 `read-only`
-- 单个 session 不兼任多个角色
+不要在 Lead 中直接创建这些 Codex session；由具体 teammate 在首次运行时内部 `ensure`。
 
 #### 0.8 讨论与需求澄清（仅复杂任务）
 
-迭代循环直到所有模糊点消除：
-
-1. 展示当前理解并用 `AskUserQuestion` 提问
-2. 用户回答后更新 `decisions.md`
-3. 若仍有模糊点继续提问
-
-完备性标准：
-- 核心目标明确
-- 约束明确
-- 影响范围明确
-- 无关键隐含假设
+如有关键模糊点，循环：
+1. 展示当前理解
+2. 用 `AskUserQuestion` 提问
+3. 用户回答后更新 `decisions.md`
+4. 达到完备性标准后进入 Phase 1
 
 ---
 
@@ -163,7 +167,7 @@ mcp__ccg-codex__codex_session_ensure({
 #### 1.1 简单任务
 
 Claude 直接分析：
-- 用 Read / Grep / Glob / 语义检索收集上下文
+- 用 Read / Grep / Glob 收集上下文
 - 输出分析结论到 `findings.md`
 - 更新 `progress.md`
 
@@ -175,35 +179,30 @@ Claude 直接分析：
 - `inputs/decisions.md`
 - `artifacts/analysis-request.md`
 
-并行调用两个分析会话：
+并行派发两个 analyzer teammate：
 
 ```
-mcp__ccg-codex__codex_session_send({
-  session_name: "<task-name>-analyzer-a",
-  state_dir: "<PLAN_DIR>/codex-sessions",
-  prompt: "Analyze the task from a logic and behavior perspective. Focus on feasibility, risks, dependencies, and edge cases. Return structured markdown.",
-  artifacts: ["<PLAN_DIR>/inputs/task.md", "<PLAN_DIR>/inputs/context.md", "<PLAN_DIR>/inputs/decisions.md", "<PLAN_DIR>/artifacts/analysis-request.md"]
+Agent({
+  subagent_type: "ccg:codex-analyzer",
+  prompt: "Thread: <task-name>\nTeammate role: analyzer-a\nPlan dir: <PLAN_DIR>\nWorkdir: <WORKDIR>\nState dir: <PLAN_DIR>/codex-sessions\nSession name: <task-name>-analyzer-a\nSandbox: read-only\nOutput file: <PLAN_DIR>/artifacts/analysis-a.md\nArtifacts:\n- <PLAN_DIR>/inputs/task.md\n- <PLAN_DIR>/inputs/context.md\n- <PLAN_DIR>/inputs/decisions.md\n- <PLAN_DIR>/artifacts/analysis-request.md\nMission: Analyze the task from a logic and behavior perspective. Focus on feasibility, risks, dependencies, and edge cases. Return structured markdown.",
+  description: "Codex teammate analyzer-a"
 })
 ```
 
 ```
-mcp__ccg-codex__codex_session_send({
-  session_name: "<task-name>-analyzer-b",
-  state_dir: "<PLAN_DIR>/codex-sessions",
-  prompt: "Analyze the task from an architecture and integration perspective. Focus on module boundaries, coupling, extensibility, and migration risk. Return structured markdown.",
-  artifacts: ["<PLAN_DIR>/inputs/task.md", "<PLAN_DIR>/inputs/context.md", "<PLAN_DIR>/inputs/decisions.md", "<PLAN_DIR>/artifacts/analysis-request.md"]
+Agent({
+  subagent_type: "ccg:codex-analyzer",
+  prompt: "Thread: <task-name>\nTeammate role: analyzer-b\nPlan dir: <PLAN_DIR>\nWorkdir: <WORKDIR>\nState dir: <PLAN_DIR>/codex-sessions\nSession name: <task-name>-analyzer-b\nSandbox: read-only\nOutput file: <PLAN_DIR>/artifacts/analysis-b.md\nArtifacts:\n- <PLAN_DIR>/inputs/task.md\n- <PLAN_DIR>/inputs/context.md\n- <PLAN_DIR>/inputs/decisions.md\n- <PLAN_DIR>/artifacts/analysis-request.md\nMission: Analyze the task from an architecture and integration perspective. Focus on module boundaries, coupling, extensibility, and migration risk. Return structured markdown.",
+  description: "Codex teammate analyzer-b"
 })
 ```
 
-合并结果后写入：
-- `artifacts/analysis-a.md`
-- `artifacts/analysis-b.md`
-- `findings.md`
+记录两个 `Agent ID` 到注册表。合并结果后写入 `findings.md`。
 
-若任一调用失败：
-- 第 1 次：收窄上下文后重试
-- 第 2 次：同角色新会话重建后重试
-- 连续失败：记录 `Codex blocked` 并停止本阶段
+失败恢复顺序：
+1. `resume` 原 analyzer teammate 并收窄任务
+2. 若 teammate 输出损坏，再重建同角色 analyzer teammate
+3. 连续失败则记录 `Codex blocked`
 
 ---
 
@@ -211,7 +210,7 @@ mcp__ccg-codex__codex_session_send({
 
 #### 2.1 简单任务
 
-Claude 直接基于分析结果输出实施计划，写入 `task_plan.md`。
+Claude 直接输出实施计划，写入 `task_plan.md`。
 
 #### 2.2 复杂任务
 
@@ -219,35 +218,33 @@ Claude 直接基于分析结果输出实施计划，写入 `task_plan.md`。
 - `inputs/findings.md`
 - `artifacts/plan-request.md`
 
-并行调用两个规划会话：
+并行派发两个 planner teammate：
 
 ```
-mcp__ccg-codex__codex_session_send({
-  session_name: "<task-name>-planner-a",
-  state_dir: "<PLAN_DIR>/codex-sessions",
-  prompt: "Produce an implementation plan focusing on execution order, data flow, error handling, and verification. Return structured markdown with steps and key files.",
-  artifacts: ["<PLAN_DIR>/inputs/task.md", "<PLAN_DIR>/inputs/decisions.md", "<PLAN_DIR>/findings.md", "<PLAN_DIR>/artifacts/plan-request.md"]
+Agent({
+  subagent_type: "ccg:codex-planner",
+  prompt: "Thread: <task-name>\nTeammate role: planner-a\nPlan dir: <PLAN_DIR>\nWorkdir: <WORKDIR>\nState dir: <PLAN_DIR>/codex-sessions\nSession name: <task-name>-planner-a\nSandbox: read-only\nOutput file: <PLAN_DIR>/artifacts/plan-a.md\nArtifacts:\n- <PLAN_DIR>/inputs/task.md\n- <PLAN_DIR>/inputs/decisions.md\n- <PLAN_DIR>/findings.md\n- <PLAN_DIR>/artifacts/plan-request.md\nMission: Produce an implementation plan focused on execution order, data flow, failure handling, and verification checkpoints.",
+  description: "Codex teammate planner-a"
 })
 ```
 
 ```
-mcp__ccg-codex__codex_session_send({
-  session_name: "<task-name>-planner-b",
-  state_dir: "<PLAN_DIR>/codex-sessions",
-  prompt: "Produce an implementation plan focusing on architecture, module boundaries, migration safety, and rollback points. Return structured markdown with steps and key files.",
-  artifacts: ["<PLAN_DIR>/inputs/task.md", "<PLAN_DIR>/inputs/decisions.md", "<PLAN_DIR>/findings.md", "<PLAN_DIR>/artifacts/plan-request.md"]
+Agent({
+  subagent_type: "ccg:codex-planner",
+  prompt: "Thread: <task-name>\nTeammate role: planner-b\nPlan dir: <PLAN_DIR>\nWorkdir: <WORKDIR>\nState dir: <PLAN_DIR>/codex-sessions\nSession name: <task-name>-planner-b\nSandbox: read-only\nOutput file: <PLAN_DIR>/artifacts/plan-b.md\nArtifacts:\n- <PLAN_DIR>/inputs/task.md\n- <PLAN_DIR>/inputs/decisions.md\n- <PLAN_DIR>/findings.md\n- <PLAN_DIR>/artifacts/plan-request.md\nMission: Produce an implementation plan focused on module boundaries, rollback points, migration safety, and regression prevention.",
+  description: "Codex teammate planner-b"
 })
 ```
 
 综合两个计划，写入 `task_plan.md`。
 
-**Hard Stop**：向用户展示计划并请求确认。用户确认后进入 Phase 3。
+**Hard Stop**：向用户展示计划，请求确认；确认后进入 Phase 3。
 
 ---
 
 ### Phase 3-5：实施 → 测试 → 审查 迭代循环
 
-形成迭代循环，最多 3 轮：
+复杂任务形成最多 3 轮循环：
 
 ```
 Phase 3（实施） → Phase 5（测试） → Phase 4（审查）
@@ -263,131 +260,106 @@ Phase 3（实施） → Phase 5（测试） → Phase 4（审查）
 
 #### Phase 3：实施
 
-#### 3.1 简单任务
+##### 3.1 简单任务
 
-Claude 直接按计划修改源码，随后自检。
+Claude 直接实施并自检。
 
-#### 3.2 复杂任务
+##### 3.2 复杂任务
 
 写入：
 - `inputs/plan.md`
 - `artifacts/implementation-request.md`
 
-通过长期 `executor` 会话实施：
+首次实施时派发 executor teammate：
 
 ```
-mcp__ccg-codex__codex_session_send({
-  session_name: "<task-name>-executor",
-  state_dir: "<PLAN_DIR>/codex-sessions",
-  prompt: "Implement the approved plan in the workspace. Reuse prior session context. Focus only on the latest requested scope. Run minimal relevant verification and report what changed.",
-  artifacts: ["<PLAN_DIR>/inputs/task.md", "<PLAN_DIR>/inputs/decisions.md", "<PLAN_DIR>/task_plan.md", "<PLAN_DIR>/artifacts/implementation-request.md"],
-  summary: "Executor session for iterative implementation"
+Agent({
+  subagent_type: "ccg:codex-executor",
+  prompt: "Thread: <task-name>\nTeammate role: executor\nPlan dir: <PLAN_DIR>\nWorkdir: <WORKDIR>\nState dir: <PLAN_DIR>/codex-sessions\nSession name: <task-name>-executor\nSandbox: workspace-write\nOutput file: <PLAN_DIR>/artifacts/implementation-result-<n>.md\nArtifacts:\n- <PLAN_DIR>/inputs/task.md\n- <PLAN_DIR>/inputs/decisions.md\n- <PLAN_DIR>/task_plan.md\n- <PLAN_DIR>/artifacts/implementation-request.md\nMission: Implement the approved plan in the workspace. Reuse prior context and focus only on the latest approved scope.",
+  description: "Codex teammate executor"
 })
 ```
 
-规则：
-- `executor` 必须使用 `workspace-write`
-- 测试失败或审查回流时继续向同一 `executor` 会话发送追加要求
-- 只有在 session 损坏、空输出、角色漂移时才重建新 `executor`
+若是测试失败或审查回流，**优先复用原 executor teammate**：
 
-产出写入：
-- `artifacts/implementation-result-<n>.md`
-- `progress.md`
+```
+Agent({
+  resume: "<EXECUTOR_AGENT_ID>",
+  prompt: "Continue the same executor teammate thread.\nPlan dir: <PLAN_DIR>\nWorkdir: <WORKDIR>\nState dir: <PLAN_DIR>/codex-sessions\nSession name: <task-name>-executor\nOutput file: <PLAN_DIR>/artifacts/implementation-result-<n>.md\nArtifacts:\n- <PLAN_DIR>/artifacts/test-failure-<n>.md\n- <PLAN_DIR>/artifacts/review-failure-<n>.md\n- <PLAN_DIR>/inputs/task.md\n- <PLAN_DIR>/task_plan.md\nMission: Fix only the newly reported issues. Do not restart full analysis or planning.",
+  description: "Resume Codex teammate executor"
+})
+```
+
+只有在以下条件成立时才重建新 executor teammate：
+- 原 `Agent ID` 缺失
+- 原 teammate 输出为空或损坏
+- teammate 已卡死/不可恢复
+- 绑定的 Codex session 被标记为 `reuse_eligible=no`
 
 ---
 
 #### Phase 5：测试
 
-测试阶段不可跳过。若项目确实无法测试，必须向用户明确说明原因并确认。
+测试阶段不可跳过。若项目确实无法自动测试，必须明确告知用户原因并取得确认。
 
-#### 5.1 执行测试
-
-优先运行项目已有的最小相关测试：
+Lead 运行最小相关验证：
 - lint
 - typecheck
 - unit/integration tests
 
-将结果写入：
+写入：
 - `artifacts/test-result-<n>.md`
 - `progress.md`
 
-#### 5.2 测试失败回流
-
 若测试失败：
-- 将失败详情追加到 `inputs/task.md`
-- 生成 `artifacts/test-failure-<n>.md`
-- **优先复用 `<task-name>-executor`**
-- `ITERATION += 1`
-
-回流时使用：
-
-```
-mcp__ccg-codex__codex_session_send({
-  session_name: "<task-name>-executor",
-  state_dir: "<PLAN_DIR>/codex-sessions",
-  prompt: "Fix the newly reported test failures without restarting full analysis. Preserve existing accepted changes unless the failures prove them incorrect.",
-  artifacts: ["<PLAN_DIR>/artifacts/test-failure-<n>.md", "<PLAN_DIR>/task_plan.md", "<PLAN_DIR>/inputs/task.md"]
-})
-```
+- 追加失败详情到 `inputs/task.md`
+- 写入 `artifacts/test-failure-<n>.md`
+- 回到 Phase 3，并优先 `resume` 原 executor teammate
 
 ---
 
 #### Phase 4：审查
 
-#### 4.1 简单任务
+##### 4.1 简单任务
 
 Claude 自己完成审查。
 
-#### 4.2 复杂任务
+##### 4.2 复杂任务
 
-生成：
+写入：
 - `artifacts/review-request-<n>.md`
 - `artifacts/diff-<n>.txt`
 
-并行调用 `reviewer-a` / `reviewer-b`：
+并行派发两个 reviewer teammate：
 
 ```
-mcp__ccg-codex__codex_session_send({
-  session_name: "<task-name>-reviewer-a",
-  state_dir: "<PLAN_DIR>/codex-sessions",
-  prompt: "Review the current changes for correctness, safety, performance, and error handling. Return findings grouped by severity.",
-  artifacts: ["<PLAN_DIR>/artifacts/diff-<n>.txt", "<PLAN_DIR>/artifacts/review-request-<n>.md", "<PLAN_DIR>/task_plan.md"]
+Agent({
+  subagent_type: "ccg:codex-reviewer",
+  prompt: "Thread: <task-name>\nTeammate role: reviewer-a\nPlan dir: <PLAN_DIR>\nWorkdir: <WORKDIR>\nState dir: <PLAN_DIR>/codex-sessions\nSession name: <task-name>-reviewer-a\nSandbox: read-only\nOutput file: <PLAN_DIR>/artifacts/review-a-<n>.md\nArtifacts:\n- <PLAN_DIR>/artifacts/diff-<n>.txt\n- <PLAN_DIR>/artifacts/review-request-<n>.md\n- <PLAN_DIR>/task_plan.md\nMission: Review correctness, safety, performance, and error handling. Return findings grouped by severity.",
+  description: "Codex teammate reviewer-a"
 })
 ```
 
 ```
-mcp__ccg-codex__codex_session_send({
-  session_name: "<task-name>-reviewer-b",
-  state_dir: "<PLAN_DIR>/codex-sessions",
-  prompt: "Review the current changes for architecture consistency, maintainability, regression risk, and testing gaps. Return findings grouped by severity.",
-  artifacts: ["<PLAN_DIR>/artifacts/diff-<n>.txt", "<PLAN_DIR>/artifacts/review-request-<n>.md", "<PLAN_DIR>/task_plan.md"]
+Agent({
+  subagent_type: "ccg:codex-reviewer",
+  prompt: "Thread: <task-name>\nTeammate role: reviewer-b\nPlan dir: <PLAN_DIR>\nWorkdir: <WORKDIR>\nState dir: <PLAN_DIR>/codex-sessions\nSession name: <task-name>-reviewer-b\nSandbox: read-only\nOutput file: <PLAN_DIR>/artifacts/review-b-<n>.md\nArtifacts:\n- <PLAN_DIR>/artifacts/diff-<n>.txt\n- <PLAN_DIR>/artifacts/review-request-<n>.md\n- <PLAN_DIR>/task_plan.md\nMission: Review architecture consistency, maintainability, regression risk, and testing gaps. Return findings grouped by severity.",
+  description: "Codex teammate reviewer-b"
 })
 ```
 
-合并审查结论，写入 `findings.md`。
+合并审查结果到 `findings.md`。
 
 若存在 Critical：
-- 生成 `artifacts/review-failure-<n>.md`
+- 写入 `artifacts/review-failure-<n>.md`
 - 将修复要求追加到 `inputs/task.md`
-- **优先复用 `<task-name>-executor`**
-- `ITERATION += 1`
-
-回流时使用：
-
-```
-mcp__ccg-codex__codex_session_send({
-  session_name: "<task-name>-executor",
-  state_dir: "<PLAN_DIR>/codex-sessions",
-  prompt: "Fix the newly reported review findings without restarting full analysis. Focus on Critical issues first.",
-  artifacts: ["<PLAN_DIR>/artifacts/review-failure-<n>.md", "<PLAN_DIR>/task_plan.md", "<PLAN_DIR>/inputs/task.md"]
-})
-```
+- 回到 Phase 3，并优先 `resume` 原 executor teammate
 
 ---
 
 ### 止损
 
-若 `ITERATION >= 3` 且仍有测试失败或 Critical：
+若 `ITERATION >= 3` 且仍未收敛：
 
 ```
 AskUserQuestion({
@@ -407,31 +379,25 @@ AskUserQuestion({
 
 完成时：
 1. 更新 `progress.md` 状态为 `complete`
-2. 写入最终摘要到 `findings.md`
-3. 关闭不再需要的 Codex 会话：
-
-```
-mcp__ccg-codex__codex_session_close({ session_name: "<task-name>-executor", state_dir: "<PLAN_DIR>/codex-sessions" })
-```
-
+2. 汇总最终摘要到 `findings.md`
+3. 将 teammate / session 注册表状态更新为 `completed`
 4. 向用户输出：
-- 变更摘要
-- 测试结果
-- 审查结果
-- 迭代次数
-- 状态文件路径
+   - 变更摘要
+   - 测试结果
+   - 审查结果
+   - 迭代次数
+   - teammate 复用情况
 
 ---
 
 ## 阶段完成后处理协议
 
-每个阶段完成后，按顺序执行：
-
-1. 将阶段结果写入 `artifacts/`
+每个阶段完成后都要：
+1. 将阶段产物写入 `artifacts/`
 2. 将关键发现追加到 `findings.md`
-3. 将错误和恢复动作写入 `progress.md`
-4. 更新 Worker / Session Registry
-5. 更新时间线与状态
+3. 更新 `progress.md`
+4. 更新 `Teammate Registry` 与 `Codex Session Registry`
+5. 记录 `Agent ID / Session Name / Session ID / reuse_eligible`
 6. 必要时向用户发送简短进度说明
 
 ---
@@ -440,22 +406,22 @@ mcp__ccg-codex__codex_session_close({ session_name: "<task-name>-executor", stat
 
 | 异常场景 | 决策 |
 |----------|------|
-| `ccg-codex` MCP 不可用 | 复杂任务直接阻塞，记录并升级给用户 |
-| Codex 输出为空 | 标记该 session 不可复用，同角色重建后重试 |
-| Codex 长时间失败 | 最多 2 次恢复，仍失败则记录 `Codex blocked` |
-| 测试失败 | 回到 Phase 3，优先复用原 `executor` |
-| 审查有 Critical | 回到 Phase 3，优先复用原 `executor` |
-| 简单任务在执行中升级为复杂 | 立即初始化 Codex Session Slots，再进入复杂路径 |
-| 同一角色连续 3 次失败 | 停止自动重试，升级给用户 |
+| `ccg-codex` MCP 不可用 | 复杂任务直接阻塞，不能改成 Lead 直连 Codex |
+| teammate 输出为空 | 标记该 teammate 不可复用，同角色重建 |
+| Codex session 空输出 | 由 teammate 标记 `reuse_eligible=no`，Lead 再决定是否重建 teammate |
+| 测试失败 | 回到 Phase 3，优先 `resume` 原 executor teammate |
+| 审查有 Critical | 回到 Phase 3，优先 `resume` 原 executor teammate |
+| 简单任务在执行中升级为复杂 | 立即初始化 teammate 槽位并切到复杂路径 |
+| 某角色 teammate 连续 3 次失败 | 停止自动重试，升级给用户 |
 
 ---
 
 ## 关键规则
 
 1. **简单任务 Claude 直做**
-2. **复杂任务靠 MCP 会话层驱动 Codex**
-3. **禁止手工管理 `SESSION_ID`**
-4. **角色隔离**：analyzer / planner / executor / reviewer 会话不可混用
-5. **执行优先复用**：测试或审查回流时先复用 `executor`
-6. **禁止静默降级**：复杂路径失败不能假装由 Claude 已补完
-7. **状态可追踪**：所有阶段和会话都要落盘到 `.claude/plan/<task-name>/`
+2. **复杂任务必须先到 teammate 层，再到 Codex**
+3. **Lead 不直接派发复杂 Codex 任务**
+4. **按角色复用 teammate**：analyzer / planner / executor / reviewer 各自独立
+5. **按角色复用 Codex session**：由 teammate 内部维护
+6. **复杂执行优先复用 executor teammate**
+7. **状态可追踪**：所有阶段与会话都要落盘到 `.claude/plan/<task-name>/`

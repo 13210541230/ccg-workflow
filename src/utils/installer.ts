@@ -22,38 +22,12 @@ function findPackageRoot(startDir: string): string {
 }
 
 const PACKAGE_ROOT = findPackageRoot(__dirname)
-
-// All available commands (29 total)
-const ALL_COMMANDS = [
-  'workflow', // 完整6阶段开发工作流
-  'plan', // 多模型协作规划（Phase 1-2）
-  'execute', // 多模型协作执行（Phase 3-5）
-  'frontend', // 前端专项（Codex主导）
-  'backend', // 后端专项（Codex主导）
-  'feat', // 智能功能开发
-  'analyze', // 技术分析
-  'debug', // 问题诊断+修复
-  'optimize', // 性能优化
-  'test', // 测试生成
-  'review', // 代码审查
-  'enhance', // Prompt 增强
-  'init', // 初始化 CLAUDE.md
-  'commit', // Git 智能提交
-  'rollback', // Git 回滚
-  'clean-branches', // Git 清理分支
-  'worktree', // Git Worktree
-  'spec-init', // OpenSpec 初始化
-  'spec-research', // 需求研究 → 约束集
-  'spec-plan', // 多模型分析 → 零决策计划
-  'spec-impl', // 多模型协作实现
-  'spec-review', // 归档前多模型审查
-  'team-research', // Agent Teams 需求研究（并行探索 → 约束集）
-  'team-plan', // Agent Teams 规划（Lead 调 Codex 产出并行计划）
-  'team-exec', // Agent Teams 并行实施（spawn Builders 并行写代码）
-  'team-review', // Agent Teams 审查（双模型交叉审查并行产出）
-  'manage', // 主Agent调度模式（自动化编排 + 状态管理 + 多维审查）
-  'teammate', // Claude/Codex 多角色 teammate 协作（消息总线 + 多 session 复用）
-] as const
+const SOURCE_ONLY_AGENT_FILES = new Set([
+  'planner.md',
+  'ui-ux-designer.md',
+  'codex-collaborator.md',
+  'codex-operator.md',
+])
 
 // Workflow configurations (for compatibility with existing code)
 const WORKFLOW_CONFIGS: WorkflowConfig[] = [
@@ -63,10 +37,10 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'Full Development Workflow',
     category: 'development',
     commands: ['workflow'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 1,
-    description: '完整6阶段开发工作流（研究→构思→计划→执行→优化→评审）',
-    descriptionEn: 'Full 6-phase development workflow',
+    description: '兼容入口：已收口到 /ccg:manage',
+    descriptionEn: 'Compatibility entry now redirected to /ccg:manage',
   },
   {
     id: 'plan',
@@ -96,10 +70,10 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'Frontend Tasks',
     category: 'development',
     commands: ['frontend'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 2,
-    description: '前端专项任务（Codex主导）',
-    descriptionEn: 'Frontend tasks (Codex-led)',
+    description: '兼容入口：前端任务统一导向 /ccg:manage',
+    descriptionEn: 'Compatibility entry: frontend tasks are routed to /ccg:manage',
   },
   {
     id: 'backend',
@@ -107,10 +81,10 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'Backend Tasks',
     category: 'development',
     commands: ['backend'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 3,
-    description: '后端专项任务（Codex主导，更快更精准）',
-    descriptionEn: 'Backend tasks (Codex-led, faster)',
+    description: '兼容入口：后端任务统一导向 /ccg:manage',
+    descriptionEn: 'Compatibility entry: backend tasks are routed to /ccg:manage',
   },
   {
     id: 'feat',
@@ -118,10 +92,10 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'Smart Feature Development',
     category: 'development',
     commands: ['feat'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 4,
-    description: '智能功能开发 - 自动规划、设计、实施',
-    descriptionEn: 'Smart feature development - auto plan, design, implement',
+    description: '兼容入口：功能开发统一导向 /ccg:manage',
+    descriptionEn: 'Compatibility entry: feature work is routed to /ccg:manage',
   },
   {
     id: 'analyze',
@@ -151,7 +125,7 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'Performance Optimization',
     category: 'development',
     commands: ['optimize'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 7,
     description: '多模型性能优化',
     descriptionEn: 'Multi-model performance optimization',
@@ -162,7 +136,7 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'Test Generation',
     category: 'development',
     commands: ['test'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 8,
     description: '智能路由测试生成',
     descriptionEn: 'Smart routing test generation',
@@ -179,6 +153,17 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     descriptionEn: 'Dual-model code review, auto-review git diff when no args',
   },
   {
+    id: 'codex',
+    name: 'Codex 直连',
+    nameEn: 'Codex Direct',
+    category: 'development',
+    commands: ['codex'],
+    defaultSelected: true,
+    order: 9.2,
+    description: '直接调用运行时后端',
+    descriptionEn: 'Direct runtime backend access',
+  },
+  {
     id: 'enhance',
     name: 'Prompt 增强',
     nameEn: 'Prompt Enhancement',
@@ -188,6 +173,17 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     order: 9.5,
     description: 'ace-tool Prompt 增强工具',
     descriptionEn: 'ace-tool prompt enhancement',
+  },
+  {
+    id: 'packs',
+    name: '扩展包管理',
+    nameEn: 'Extension Packs',
+    category: 'development',
+    commands: ['packs'],
+    defaultSelected: true,
+    order: 9.6,
+    description: '列出、安装、卸载可选命令包',
+    descriptionEn: 'List, install, and remove optional command packs',
   },
   {
     id: 'init-project',
@@ -228,7 +224,7 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'Git Clean Branches',
     category: 'git',
     commands: ['clean-branches'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 22,
     description: '安全清理已合并或过期分支',
     descriptionEn: 'Safely clean merged or stale branches',
@@ -250,7 +246,7 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'OpenSpec Init',
     category: 'spec',
     commands: ['spec-init'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 30,
     description: '初始化 OpenSpec 环境 + 验证多模型 MCP 工具',
     descriptionEn: 'Initialize OpenSpec environment with multi-model MCP validation',
@@ -261,7 +257,7 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'Spec Research',
     category: 'spec',
     commands: ['spec-research'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 31,
     description: '需求 → 约束集（并行探索 + OpenSpec 提案）',
     descriptionEn: 'Transform requirements into constraint sets via parallel exploration',
@@ -272,7 +268,7 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'Spec Plan',
     category: 'spec',
     commands: ['spec-plan'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 32,
     description: '多模型分析 → 消除歧义 → 零决策可执行计划',
     descriptionEn: 'Refine proposals into zero-decision executable plans',
@@ -283,7 +279,7 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'Spec Implementation',
     category: 'spec',
     commands: ['spec-impl'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 33,
     description: '按规范执行 + 多模型协作 + 归档',
     descriptionEn: 'Execute changes via multi-model collaboration with spec compliance',
@@ -294,7 +290,7 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'Spec Review',
     category: 'spec',
     commands: ['spec-review'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 34,
     description: '双模型交叉审查 → Critical 必须修复 → 允许归档',
     descriptionEn: 'Multi-model compliance review before archiving',
@@ -305,7 +301,7 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'Agent Teams Research',
     category: 'development',
     commands: ['team-research'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 1.8,
     description: '并行探索代码库，产出约束集 + 可验证成功判据',
     descriptionEn: 'Parallel codebase exploration, produces constraint sets + success criteria',
@@ -316,7 +312,7 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'Agent Teams Planning',
     category: 'development',
     commands: ['team-plan'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 2.1,
     description: 'Lead 调用 Codex 并行分析，产出零决策并行实施计划',
     descriptionEn: 'Lead orchestrates Codex analysis, produces zero-decision parallel plan',
@@ -327,7 +323,7 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'Agent Teams Parallel Execution',
     category: 'development',
     commands: ['team-exec'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 2.5,
     description: '读取计划文件，spawn Builder teammates 并行写代码，需启用 Agent Teams',
     descriptionEn: 'Read plan file, spawn Builder teammates for parallel implementation',
@@ -338,7 +334,7 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'Agent Teams Review',
     category: 'development',
     commands: ['team-review'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 3.1,
     description: '双模型交叉审查并行实施产出，分级处理 Critical/Warning/Info',
     descriptionEn: 'Dual-model cross-review with severity classification',
@@ -360,10 +356,10 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     nameEn: 'Teammate Collaboration',
     category: 'development',
     commands: ['teammate'],
-    defaultSelected: true,
+    defaultSelected: false,
     order: 0.6,
-    description: 'Claude Lead 与多个角色化 Codex Partner 的消息总线式协作，强调多 session 复用与结构化对话',
-    descriptionEn: 'Message-bus collaboration between Claude Lead and multiple role-specific Codex partners with session reuse',
+    description: '兼容入口：teammate 模式已并回 /ccg:manage',
+    descriptionEn: 'Compatibility entry: teammate mode is folded back into /ccg:manage',
   },
 ]
 
@@ -383,16 +379,31 @@ export function getAllCommandIds(): string[] {
   return WORKFLOW_CONFIGS.map(w => w.id)
 }
 
+export function getDefaultCommandIds(): string[] {
+  return WORKFLOW_CONFIGS.filter(w => w.defaultSelected).map(w => w.id)
+}
+
+export function getOptionalCommandIds(): string[] {
+  return WORKFLOW_CONFIGS.filter(w => !w.defaultSelected).map(w => w.id)
+}
+
 /**
  * @deprecated Use getAllCommandIds() instead
  * Kept for backward compatibility
  */
 export const WORKFLOW_PRESETS = {
+  default: {
+    name: '默认核心',
+    nameEn: 'Default Core',
+    description: '默认安装的核心命令集',
+    descriptionEn: 'Default core command set',
+    workflows: WORKFLOW_CONFIGS.filter(w => w.defaultSelected).map(w => w.id),
+  },
   full: {
     name: '完整',
     nameEn: 'Full',
-    description: '全部命令（29个）',
-    descriptionEn: 'All commands (29)',
+    description: `全部命令（${WORKFLOW_CONFIGS.length}个）`,
+    descriptionEn: `All commands (${WORKFLOW_CONFIGS.length})`,
     workflows: WORKFLOW_CONFIGS.map(w => w.id),
   },
 }
@@ -597,11 +608,13 @@ export async function installWorkflows(
   const ccgConfigDir = join(installDir, '.ccg') // v1.4.0: 配置目录
   const promptsDir = join(ccgConfigDir, 'prompts') // v1.4.0: prompts 移到配置目录
   const scriptsDir = join(ccgConfigDir, 'scripts')
+  const packsDir = join(ccgConfigDir, 'packs')
 
   await fs.ensureDir(commandsDir)
   await fs.ensureDir(ccgConfigDir)
   await fs.ensureDir(promptsDir)
   await fs.ensureDir(scriptsDir)
+  await fs.ensureDir(packsDir)
 
   // Get template source directory (relative to this package)
   const templateDir = join(PACKAGE_ROOT, 'templates')
@@ -660,7 +673,7 @@ ${workflow.description}
       await fs.ensureDir(agentsDestDir)
       const agentFiles = await fs.readdir(agentsSrcDir)
       for (const file of agentFiles) {
-        if (file.endsWith('.md')) {
+        if (file.endsWith('.md') && !SOURCE_ONLY_AGENT_FILES.has(file)) {
           const srcFile = join(agentsSrcDir, file)
           const destFile = join(agentsDestDir, file)
           if (force || !(await fs.pathExists(destFile))) {
@@ -833,6 +846,54 @@ ${workflow.description}
   }
   catch (error) {
     result.errors.push(`Failed to install runtime scripts: ${error}`)
+    result.success = false
+  }
+
+  // Install optional command pack assets for /ccg:packs
+  try {
+    const packManifestTemplate = join(templateDir, 'plugin', 'packs', 'manifest.template.json')
+    if (await fs.pathExists(packManifestTemplate)) {
+      const manifest = await fs.readJSON(packManifestTemplate) as {
+        packs?: Record<string, { description?: string, command_names?: string[] }>
+      }
+      const outputManifest: {
+        packs: Record<string, { description: string, command_names: string[], commands: string[] }>
+      } = { packs: {} }
+
+      for (const [packName, packConfig] of Object.entries(manifest.packs || {})) {
+        const commandNames = Array.isArray(packConfig.command_names) ? packConfig.command_names : []
+        const packCommandsDir = join(packsDir, packName, 'commands')
+        await fs.ensureDir(packCommandsDir)
+
+        for (const commandName of commandNames) {
+          const srcFile = join(templateDir, 'commands', `${commandName}.md`)
+          const destFile = join(packCommandsDir, `${commandName}.md`)
+          if (!(await fs.pathExists(srcFile))) {
+            result.errors.push(`Failed to install pack ${packName}: missing command template ${commandName}.md`)
+            result.success = false
+            continue
+          }
+
+          if (force || !(await fs.pathExists(destFile))) {
+            let templateContent = await fs.readFile(srcFile, 'utf-8')
+            templateContent = injectConfigVariables(templateContent, installConfig)
+            const processedContent = replaceHomePathsInTemplate(templateContent, installDir)
+            await fs.writeFile(destFile, processedContent, 'utf-8')
+          }
+        }
+
+        outputManifest.packs[packName] = {
+          description: packConfig.description || '',
+          command_names: commandNames,
+          commands: commandNames.map(commandName => `commands/${commandName}.md`),
+        }
+      }
+
+      await fs.writeJSON(join(packsDir, 'manifest.json'), outputManifest, { spaces: 2 })
+    }
+  }
+  catch (error) {
+    result.errors.push(`Failed to install command packs: ${error}`)
     result.success = false
   }
 

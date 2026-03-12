@@ -6,12 +6,13 @@
 - `.claude/plan/<task-name>/bus/registry.json`
 - `.claude/plan/<task-name>/artifacts/`
 
-它支持多个长期 Codex Partner，至少包括：
+它支持多个长期 Codex teammate，至少包括：
+- `analyzer`
 - `planner`
 - `executor`
 - `reviewer`
 
-这三个角色必须登记为三个独立 Partner：
+这些角色必须登记为独立 teammate：
 - 各自拥有独立 `agent_id`
 - 各自拥有独立 `session_id`
 - 各自只处理本角色职责
@@ -25,7 +26,7 @@
   "id": "msg-001",
   "thread_id": "verify-manage-flow",
   "from": "claude-lead",
-  "to": "planner|executor|reviewer|claude-lead",
+  "to": "analyzer|planner|executor|reviewer|claude-lead",
   "type": "question|decision|blocker|result|handoff|review",
   "summary": "One-line summary",
   "body_file": ".claude/plan/verify-manage-flow/artifacts/review-findings-1.md",
@@ -43,7 +44,7 @@
 - 长正文一律写到 `body_file`
 - `artifacts` 只放文件路径，不内嵌大段文本
 - `blocking=true` 表示对方必须先回复再继续
-- `to` 只能写单一角色，避免多个 Codex 同时消费同一消息
+- `to` 只能写单一角色，避免多个 teammate 同时消费同一消息
 
 ## registry.json
 
@@ -57,11 +58,20 @@
     "role": "claude-lead",
     "status": "active"
   },
- "partners": {
+  "partners": {
+    "analyzer": {
+      "session_name": "verify-manage-flow-analyzer-a",
+      "agent_id": "agent-analyze-123",
+      "subagent_type": "ccg:codex-analyzer",
+      "session_id": "session-analyze-001",
+      "status": "running|completed|failed|blocked|not_started",
+      "reuse_eligible": true,
+      "last_output_file": ".claude/plan/verify-manage-flow/artifacts/analysis-a.md"
+    },
     "planner": {
       "session_name": "verify-manage-flow-planner",
       "agent_id": "agent-plan-123",
-      "subagent_type": "ccg:codex-collaborator",
+      "subagent_type": "ccg:codex-planner",
       "session_id": "session-plan-001",
       "status": "running|completed|failed|blocked|not_started",
       "reuse_eligible": true,
@@ -70,7 +80,7 @@
     "executor": {
       "session_name": "verify-manage-flow-executor",
       "agent_id": "agent-exec-123",
-      "subagent_type": "ccg:codex-collaborator",
+      "subagent_type": "ccg:codex-executor",
       "session_id": "session-exec-001",
       "status": "running|completed|failed|blocked|not_started",
       "reuse_eligible": true,
@@ -79,7 +89,7 @@
     "reviewer": {
       "session_name": "verify-manage-flow-reviewer",
       "agent_id": "agent-review-123",
-      "subagent_type": "ccg:codex-collaborator",
+      "subagent_type": "ccg:codex-reviewer",
       "session_id": "session-review-001",
       "status": "running|completed|failed|blocked|not_started",
       "reuse_eligible": true,
@@ -90,10 +100,11 @@
 ```
 
 规则：
-- 各角色 Partner spawn 成功后立即登记
-- 各角色 Partner 应通过 `ccg-codex` MCP 的 `codex_session_ensure` / `codex_session_send` 维护
-- `planner / executor / reviewer` 必须保留各自独立的 `agent_id` 和 `session_id`
+- 各角色 teammate spawn 成功后立即登记
+- 各角色 teammate 通过 `ccg-codex` MCP 的 `codex_session_ensure` / `codex_session_send` 维护底层 session
+- `analyzer / planner / executor / reviewer` 必须保留各自独立的 `agent_id` 和 `session_id`
 - 建议同时记录 `session_name`，供 MCP 工具稳定复用
+- 复杂分析优先看 `analyzer.reuse_eligible`
 - 复杂规划优先看 `planner.reuse_eligible`
 - 测试失败和修复回流优先看 `executor.reuse_eligible`
 - 正式审查优先看 `reviewer.reuse_eligible`
@@ -105,6 +116,8 @@
 
 建议文件：
 
+- `analysis-request-<n>.md`
+- `analysis-<n>.md`
 - `plan-request-<n>.md`
 - `plan-<n>.md`
 - `implementation-<n>.md`

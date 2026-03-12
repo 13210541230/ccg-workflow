@@ -220,10 +220,13 @@ describe('integration: real templates with skip mode', () => {
     return content.includes('{{MCP_SEARCH_TOOL}}')
   })
 
-  // Sanity check: we expect at least 12 files with MCP references
-  // (frontend.md and backend.md now reference shared workflow instead of inline MCP)
+  // Sanity check: keep enough real templates exercising MCP placeholder replacement
+  // Compatibility wrappers may remove some historical references over time.
   it('finds templates containing {{MCP_SEARCH_TOOL}}', () => {
-    expect(filesWithMcpRef.length).toBeGreaterThanOrEqual(12)
+    const normalized = filesWithMcpRef.map(file => file.replace(/\\/g, '/'))
+    expect(filesWithMcpRef.length).toBeGreaterThanOrEqual(10)
+    expect(normalized.some(f => f.endsWith('templates/commands/plan.md'))).toBe(true)
+    expect(normalized.some(f => f.endsWith('templates/commands/analyze.md'))).toBe(true)
   })
 
   for (const file of filesWithMcpRef) {

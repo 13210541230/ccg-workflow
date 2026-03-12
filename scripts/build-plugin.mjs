@@ -14,9 +14,10 @@
  *   6. templates/plugin/plugin.json → dist/plugin/.claude-plugin/plugin.json (注入版本号)
  *   7. templates/plugin/.mcp.json → dist/plugin/.mcp.json
  *   8. templates/plugin/start.mjs → dist/plugin/start.mjs
- *   9. src/plugin/ccg-codex-server.mjs → dist/plugin/server.bundle.mjs
- *  10. templates/plugin/hooks/ → dist/plugin/hooks/
- *  11. templates/plugin/scripts/ → dist/plugin/scripts/ (codex_bridge.py 等)
+ *   9. templates/plugin/packs/manifest.template.json + 可选命令模板 → dist/plugin/packs/
+ *  10. src/plugin/ccg-codex-server.mjs → dist/plugin/server.bundle.mjs
+ *  11. templates/plugin/hooks/ → dist/plugin/hooks/
+ *  12. templates/plugin/scripts/ → dist/plugin/scripts/ (codex_bridge.py 等)
  */
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
@@ -35,7 +36,34 @@ const PROMPTS_DIR = path.join(TEMPLATES_DIR, 'prompts')
 const OUTPUT_STYLES_DIR = path.join(TEMPLATES_DIR, 'output-styles')
 const PLUGIN_TEMPLATE_DIR = path.join(TEMPLATES_DIR, 'plugin')
 const SKILLS_DIR = path.join(TEMPLATES_DIR, 'skills')
+const PACK_MANIFEST_TEMPLATE = path.join(PLUGIN_TEMPLATE_DIR, 'packs', 'manifest.template.json')
 const MCP_SERVER_SOURCE = path.join(ROOT, 'src', 'plugin', 'ccg-codex-server.mjs')
+const SOURCE_ONLY_COMMAND_FILES = new Set([
+  'workflow.md',
+  'feat.md',
+  'frontend.md',
+  'backend.md',
+  'teammate.md',
+  'validation-probe.md',
+  'optimize.md',
+  'test.md',
+  'clean-branches.md',
+  'spec-init.md',
+  'spec-research.md',
+  'spec-plan.md',
+  'spec-impl.md',
+  'spec-review.md',
+  'team-research.md',
+  'team-plan.md',
+  'team-exec.md',
+  'team-review.md',
+])
+const SOURCE_ONLY_AGENT_FILES = new Set([
+  'planner.md',
+  'ui-ux-designer.md',
+  'codex-collaborator.md',
+  'codex-operator.md',
+])
 
 // 默认输出
 const DEFAULT_OUT_DIR = path.join(ROOT, 'dist', 'plugin')
@@ -102,7 +130,7 @@ async function main() {
   await fs.rm(outDir, { recursive: true, force: true })
 
   // 2. 创建目录结构
-  for (const dir of ['.claude-plugin', 'commands', 'agents', 'prompts', 'output-styles', 'hooks', 'scripts', 'shared', 'skills']) {
+  for (const dir of ['.claude-plugin', 'commands', 'agents', 'packs', 'prompts', 'output-styles', 'hooks', 'scripts', 'shared', 'skills']) {
     await fs.mkdir(path.join(outDir, dir), { recursive: true })
   }
 
@@ -124,10 +152,13 @@ async function main() {
   // 8. 复制插件根运行时文件（start.mjs）
   await copyPluginRootRuntimeFiles(outDir)
 
-  // 9. 构建 MCP server bundle
+  // 9. 构建可选命令包
+  await buildPacks(outDir)
+
+  // 10. 构建 MCP server bundle
   await buildPluginMcpServer(outDir)
 
-  // 10. 复制 shared（多模型调用规范、共享工作流、子Agent prompts）
+  // 11. 复制 shared（多模型调用规范、共享工作流、子Agent prompts）
   const sharedDir = path.join(TEMPLATES_DIR, 'shared')
   try {
     await copyDirWithTransform(sharedDir, path.join(outDir, 'shared'))
@@ -137,10 +168,10 @@ async function main() {
     log(`  shared: 目录不存在，跳过`)
   }
 
-  // 11. 复制 hooks
+  // 12. 复制 hooks
   await copyDir(path.join(PLUGIN_TEMPLATE_DIR, 'hooks'), path.join(outDir, 'hooks'))
 
-  // 12. 复制 scripts（codex_bridge.py + manage 钩子等），强制 LF 行尾
+  // 13. 复制 scripts（codex_bridge.py + manage 钩子等），强制 LF 行尾
   const scriptsDir = path.join(PLUGIN_TEMPLATE_DIR, 'scripts')
   try {
     await copyDirWithLF(scriptsDir, path.join(outDir, 'scripts'))
@@ -150,7 +181,7 @@ async function main() {
     log(`  scripts: 目录不存在，跳过`)
   }
 
-  // 13. 复制 skills
+  // 14. 复制 skills
   try {
     await copyDirWithTransform(SKILLS_DIR, path.join(outDir, 'skills'))
     log(`  skills: templates/skills/ → skills/`)
@@ -159,7 +190,7 @@ async function main() {
     log(`  skills: 目录不存在，跳过`)
   }
 
-  // 14. 验证输出
+  // 15. 验证输出
   const warnings = await validateOutput(outDir)
 
   console.log(`[build-plugin] 完成: ${cmdCount} commands, ${agentCount} agents`)
@@ -191,7 +222,7 @@ function resolveOutDir(argv) {
 async function buildCommands(dir) {
   const entries = await fs.readdir(COMMANDS_DIR, { withFileTypes: true })
   const commandFiles = entries
-    .filter(e => e.isFile() && e.name.endsWith('.md'))
+    .filter(e => e.isFile() && e.name.endsWith('.md') && !SOURCE_ONLY_COMMAND_FILES.has(e.name))
     .map(e => e.name)
     .sort()
 
@@ -218,7 +249,7 @@ async function buildAgents(dir) {
   const entries = await fs.readdir(AGENTS_DIR, { withFileTypes: true })
   let count = 0
   for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.endsWith('.md')) continue
+    if (!entry.isFile() || !entry.name.endsWith('.md') || SOURCE_ONLY_AGENT_FILES.has(entry.name)) continue
 
     const sourcePath = path.join(AGENTS_DIR, entry.name)
     const targetPath = path.join(dir, 'agents', entry.name)
@@ -262,6 +293,38 @@ async function writePluginConfigs(dir) {
     path.join(dir, '.mcp.json'),
   )
   log(`  config: plugin.json (v${pkgJson.version}) + marketplace.json + .mcp.json`)
+}
+
+async function buildPacks(dir) {
+  const manifestTemplate = JSON.parse(await fs.readFile(PACK_MANIFEST_TEMPLATE, 'utf-8'))
+  const outputManifest = { packs: {} }
+
+  for (const [packName, packConfig] of Object.entries(manifestTemplate.packs || {})) {
+    const commandNames = Array.isArray(packConfig.command_names) ? packConfig.command_names : []
+    const packCommandsDir = path.join(dir, 'packs', packName, 'commands')
+    await fs.mkdir(packCommandsDir, { recursive: true })
+
+    for (const commandName of commandNames) {
+      const sourcePath = path.join(COMMANDS_DIR, `${commandName}.md`)
+      const targetPath = path.join(packCommandsDir, `${commandName}.md`)
+      const source = await fs.readFile(sourcePath, 'utf-8')
+      const transformed = applyRules(source)
+      await fs.writeFile(targetPath, transformed, 'utf-8')
+    }
+
+    outputManifest.packs[packName] = {
+      description: packConfig.description || '',
+      command_names: commandNames,
+      commands: commandNames.map(commandName => `commands/${commandName}.md`),
+    }
+    log(`  pack: ${packName} (${commandNames.join(', ')})`)
+  }
+
+  await fs.writeFile(
+    path.join(dir, 'packs', 'manifest.json'),
+    JSON.stringify(outputManifest, null, 2) + '\n',
+    'utf-8',
+  )
 }
 
 async function copyPluginRootRuntimeFiles(dir) {

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.9.0] - 2026-03-12
+
+### ✨ 新功能
+
+- **新增 `/ccg:packs` 扩展包管理命令**：插件用户现在可以直接列出、安装、卸载可选命令包，不再需要通过源码层手工复制扩展命令
+- **扩展命令正式包化**：`legacy / extras / spec / team` 这 4 组可选命令现在会随插件一起发布为 pack 资产，并按需安装到 `~/.claude/commands/ccg/`
+
+### ♻️ 重构
+
+- **默认命令面进一步收口**：插件默认只发布 13 个核心命令，`workflow / feat / frontend / backend / teammate / spec-* / team-* / optimize / test / clean-branches` 不再进入主命令列表
+- **源码安装与插件安装对齐**：安装器现在会同时生成 `~/.claude/.ccg/packs/`，让 `/ccg:packs` 在源码安装和插件安装两种模式下都能工作
+
+### 🐛 修复
+
+- **修复插件发版遗漏 pack 资产**：release 脚本现在会同步 `packs/` 目录到 `ccg-plugin`，避免发布版存在 `/ccg:packs` 但缺少 pack manifest 和命令资产
+- **修复角色化 Codex 会话缺口**：`ccg-codex` runtime 现在正式支持 `planner` 和 `executor` 角色，避免 `/ccg:manage` 复杂路径中出现 `Unknown role`
+
 ## [1.8.2] - 2026-03-12
 
 ### 🐛 修复

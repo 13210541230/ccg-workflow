@@ -103,7 +103,7 @@ if [[ "$SKIP_PLUGIN" == "false" ]]; then
     fi
 
     # 按当前插件产物逐目录复制（保留 .git 和 README.md）
-    for dir in .claude-plugin agents commands hooks output-styles prompts scripts shared skills; do
+    for dir in .claude-plugin agents commands hooks output-styles packs prompts scripts shared skills; do
         rm -rf "$PLUGIN_REPO/$dir"
         if [[ -d "dist/plugin/$dir" ]]; then
             cp -r "dist/plugin/$dir" "$PLUGIN_REPO/$dir"

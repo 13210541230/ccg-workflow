@@ -7,7 +7,7 @@
 
 </div>
 
-以 Claude Code 为编排中心，协调 Codex / Gemini 进行多模型协作开发。当前默认后端仍为 Codex，Gemini 链路保留为可切换执行路径。
+以 Claude Code 为编排中心，协调 Codex / Gemini 进行多模型协作开发。当前默认后端仍为 Codex，复杂任务路径会优先通过 `codex-* teammate` 代理与底层 Codex 持续协作。
 
 ## 安装
 
@@ -29,28 +29,47 @@
 
 ## 命令
 
+### 默认核心命令
+
+默认安装会优先铺设这组核心命令：
+
 | 命令 | 说明 |
 |------|------|
-| `/ccg:workflow` | 6 阶段完整工作流 |
-| `/ccg:plan` | 多模型协作规划 (Phase 1-2) |
-| `/ccg:execute` | 多模型协作执行 (Phase 3-5) |
-| `/ccg:feat` | 新功能开发 |
-| `/ccg:frontend` | 前端任务 |
-| `/ccg:backend` | 后端任务 (Codex) |
+| `/ccg:manage` | 统一主编排入口 |
+| `/ccg:plan` | 高级模式：只做规划 |
+| `/ccg:execute` | 高级模式：只做执行 |
 | `/ccg:codex` | 直接调用运行时后端 |
+| `/ccg:packs` | 扩展包管理：按需安装可选命令 |
 | `/ccg:analyze` | 技术分析 |
 | `/ccg:debug` | 问题诊断 |
-| `/ccg:optimize` | 性能优化 |
-| `/ccg:test` | 测试生成 |
 | `/ccg:review` | 代码审查 |
-| `/ccg:manage` | 主Agent调度 |
-| `/ccg:teammate` | Claude/Codex 多角色多会话协作 |
-| `/ccg:commit` | Git 提交 |
-| `/ccg:rollback` | Git 回滚 |
-| `/ccg:clean-branches` | 清理分支 |
-| `/ccg:worktree` | Worktree 管理 |
 | `/ccg:init` | 初始化 CLAUDE.md |
 | `/ccg:enhance` | Prompt 增强 |
+| `/ccg:commit` | Git 提交 |
+| `/ccg:rollback` | Git 回滚 |
+| `/ccg:worktree` | Worktree 管理 |
+
+### 源码兼容入口
+
+这些命令仅保留在源码兼容层，默认不会进入插件发布产物；如通过源码模板或自定义安装使用，它们都会收口到 `/ccg:manage`：
+
+| 命令 | 说明 |
+|------|------|
+| `/ccg:workflow` | 兼容旧的完整工作流入口 |
+| `/ccg:feat` | 兼容旧的功能开发入口 |
+| `/ccg:frontend` | 兼容旧的前端专项入口 |
+| `/ccg:backend` | 兼容旧的后端专项入口 |
+| `/ccg:teammate` | 兼容旧的 teammate 协作入口 |
+
+### 可选扩展命令
+
+这组命令源码保留，但默认不会进入插件发布产物；插件用户可通过 `/ccg:packs install <pack>` 按需安装：
+
+| 命令 | 说明 |
+|------|------|
+| `/ccg:optimize` | 性能优化 |
+| `/ccg:test` | 测试生成 |
+| `/ccg:clean-branches` | 清理分支 |
 | `/ccg:spec-init` | 初始化 OPSX 环境 |
 | `/ccg:spec-research` | 需求 → 约束集 |
 | `/ccg:spec-plan` | 约束 → 零决策计划 |
@@ -60,6 +79,27 @@
 | `/ccg:team-plan` | Agent Teams 约束 → 并行计划 |
 | `/ccg:team-exec` | Agent Teams 并行实施 |
 | `/ccg:team-review` | Agent Teams 双模型审查 |
+
+### 扩展包安装
+
+插件模式下，使用 `/ccg:packs` 管理可选命令包：
+
+```bash
+/ccg:packs list
+/ccg:packs install extras
+/ccg:packs install spec
+/ccg:packs status
+/ccg:packs remove extras
+```
+
+当前 pack 分组：
+
+| Pack | 命令 |
+|------|------|
+| `legacy` | `workflow / feat / frontend / backend / teammate` |
+| `extras` | `optimize / test / clean-branches` |
+| `spec` | `spec-init / spec-research / spec-plan / spec-impl / spec-review` |
+| `team` | `team-research / team-plan / team-exec / team-review` |
 
 ### OPSX 规范驱动（v1.7.52+）
 
@@ -146,26 +186,48 @@
 - `codex_session_send`：自动复用已有 `SESSION_ID` 持续对话
 - `codex_session_status` / `codex_session_list` / `codex_session_close`
 
+内置角色：
+- 工作流角色：`analyzer` / `planner` / `executor` / `reviewer`
+- 兼容角色：`architect` / `debugger` / `optimizer` / `tester` / `frontend`
+
 建议：
 - 普通任务直接用 `codex_once` 或 `codex_session_send`
-- 复杂协作任务让 `/ccg:teammate` 或未来替代 `manage` 的指令基于这些工具编排
+- 复杂协作任务让 `/ccg:manage` 或 `/ccg:teammate` 通过 `codex-* teammate` 编排，Lead 不直接维护复杂 session
 
 ## 架构
 
 ```
-Claude Code (编排)
-       │
-   ┌───┴───┐
-   ↓       ↓
-Codex   Codex-B
-(后端)   (前端)
-   │       │
-   └───┬───┘
-       ↓
-  Unified Patch
+Claude Lead
+    │
+    ├── codex-analyzer teammate
+    ├── codex-planner teammate
+    ├── codex-executor teammate
+    └── codex-reviewer teammate
+             │
+             ↓
+        ccg-codex MCP
+             │
+             ↓
+           Codex
 ```
 
-外部模型无写入权限，仅返回 Patch，由 Claude 审核后应用。
+简单任务可由 Claude 直接完成；复杂任务优先走 teammate 代理层，再由 teammate 复用底层 Codex session。
+
+## Agent 状态
+
+默认安装和插件发布产物现在只保留活动 agent：
+- `codex-analyzer`
+- `codex-planner`
+- `codex-executor`
+- `codex-reviewer`
+- `init-architect`
+- `get-current-datetime`
+
+以下旧 agent 仅保留在源码兼容层，不进入默认安装和插件构建：
+- `planner`
+- `ui-ux-designer`
+- `codex-collaborator`
+- `codex-operator`
 
 ## 致谢
 
@@ -182,4 +244,4 @@ MIT
 
 ---
 
-v1.8.0 | [Issues](https://github.com/fengshao1227/ccg-workflow/issues)
+v1.9.0 | [Issues](https://github.com/fengshao1227/ccg-workflow/issues)

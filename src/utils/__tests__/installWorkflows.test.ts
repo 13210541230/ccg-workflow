@@ -3,9 +3,35 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterAll, describe, expect, it } from 'vitest'
 import fs from 'fs-extra'
-import { getAllCommandIds, installWorkflows } from '../installer'
+import { getAllCommandIds, getDefaultCommandIds, getOptionalCommandIds, installWorkflows } from '../installer'
 
 const ALL_IDS = getAllCommandIds()
+const DEFAULT_IDS = getDefaultCommandIds()
+const OPTIONAL_IDS = getOptionalCommandIds()
+
+describe('command set selection', () => {
+  it('installs codex in the default core set', () => {
+    expect(DEFAULT_IDS).toContain('codex')
+    expect(DEFAULT_IDS).toContain('manage')
+    expect(DEFAULT_IDS).toContain('packs')
+  })
+
+  it('keeps compatibility wrappers out of the default core set', () => {
+    expect(DEFAULT_IDS).not.toContain('workflow')
+    expect(DEFAULT_IDS).not.toContain('feat')
+    expect(DEFAULT_IDS).not.toContain('frontend')
+    expect(DEFAULT_IDS).not.toContain('backend')
+    expect(DEFAULT_IDS).not.toContain('teammate')
+  })
+
+  it('keeps optional extensions out of the default core set', () => {
+    expect(DEFAULT_IDS).not.toContain('spec-init')
+    expect(DEFAULT_IDS).not.toContain('team-plan')
+    expect(DEFAULT_IDS).not.toContain('optimize')
+    expect(OPTIONAL_IDS).toContain('spec-init')
+    expect(OPTIONAL_IDS).toContain('team-plan')
+  })
+})
 
 // Collect all .md files recursively
 function collectMdFiles(dir: string): string[] {
@@ -70,6 +96,15 @@ describe('installWorkflows E2E — mcpProvider="skip"', () => {
     }
   })
 
+  it('excludes legacy source-only agents from installation', async () => {
+    const agentDir = join(tmpDir, 'agents', 'ccg')
+    expect(fs.existsSync(join(agentDir, 'planner.md'))).toBe(false)
+    expect(fs.existsSync(join(agentDir, 'ui-ux-designer.md'))).toBe(false)
+    expect(fs.existsSync(join(agentDir, 'codex-collaborator.md'))).toBe(false)
+    expect(fs.existsSync(join(agentDir, 'codex-operator.md'))).toBe(false)
+    expect(fs.existsSync(join(agentDir, 'codex-analyzer.md'))).toBe(true)
+  })
+
   it('plan.md contains Glob + Grep fallback guidance', async () => {
     const content = readFileSync(join(tmpDir, 'commands', 'ccg', 'plan.md'), 'utf-8')
     expect(content).toContain('Glob + Grep')
@@ -82,10 +117,21 @@ describe('installWorkflows E2E — mcpProvider="skip"', () => {
     expect(content).toContain('MCP 未配置')
   })
 
-  it('planner.md frontmatter has no MCP tool in tools declaration', async () => {
-    const content = readFileSync(join(tmpDir, 'agents', 'ccg', 'planner.md'), 'utf-8')
-    const toolsLine = content.split('\n').find(l => l.startsWith('tools:'))?.trim()
-    expect(toolsLine).toBe('tools: Read, Write')
+  it('keeps active codex teammate agents installed', async () => {
+    const content = readFileSync(join(tmpDir, 'agents', 'ccg', 'codex-analyzer.md'), 'utf-8')
+    expect(content).toContain('mcp__ccg-codex__codex_session_ensure')
+    expect(content).toContain('mcp__ccg-codex__codex_session_send')
+  })
+
+  it('installs optional command pack assets for packs command', async () => {
+    const manifestPath = join(tmpDir, '.ccg', 'packs', 'manifest.json')
+    expect(fs.existsSync(manifestPath)).toBe(true)
+
+    const manifest = fs.readJSONSync(manifestPath)
+    expect(manifest.packs.legacy.command_names).toContain('workflow')
+    expect(manifest.packs.spec.command_names).toContain('spec-plan')
+    expect(fs.existsSync(join(tmpDir, '.ccg', 'packs', 'extras', 'commands', 'optimize.md'))).toBe(true)
+    expect(fs.existsSync(join(tmpDir, '.ccg', 'packs', 'team', 'commands', 'team-review.md'))).toBe(true)
   })
 })
 
@@ -113,10 +159,10 @@ describe('installWorkflows E2E — mcpProvider="fast-context" (default)', () => 
     expect(planContent).not.toContain('{{MCP_SEARCH_TOOL}}')
   })
 
-  it('generated agent files contain mcp__fast-context__fast_context_search', async () => {
-    const plannerContent = readFileSync(join(tmpDir, 'agents', 'ccg', 'planner.md'), 'utf-8')
-    expect(plannerContent).toContain('mcp__fast-context__fast_context_search')
-    expect(plannerContent).not.toContain('{{MCP_SEARCH_TOOL}}')
+  it('keeps active codex teammate agents stable under fast-context install', async () => {
+    const analyzerContent = readFileSync(join(tmpDir, 'agents', 'ccg', 'codex-analyzer.md'), 'utf-8')
+    expect(analyzerContent).toContain('mcp__ccg-codex__codex_session_ensure')
+    expect(analyzerContent).not.toContain('{{MCP_SEARCH_TOOL}}')
   })
 })
 
@@ -144,9 +190,9 @@ describe('installWorkflows E2E — mcpProvider="ace-tool" (explicit)', () => {
     expect(planContent).not.toContain('{{MCP_SEARCH_TOOL}}')
   })
 
-  it('generated agent files contain mcp__ace-tool__search_context', async () => {
-    const plannerContent = readFileSync(join(tmpDir, 'agents', 'ccg', 'planner.md'), 'utf-8')
-    expect(plannerContent).toContain('mcp__ace-tool__search_context')
-    expect(plannerContent).not.toContain('{{MCP_SEARCH_TOOL}}')
+  it('keeps active codex teammate agents stable under ace-tool install', async () => {
+    const analyzerContent = readFileSync(join(tmpDir, 'agents', 'ccg', 'codex-analyzer.md'), 'utf-8')
+    expect(analyzerContent).toContain('mcp__ccg-codex__codex_session_ensure')
+    expect(analyzerContent).not.toContain('{{MCP_SEARCH_TOOL}}')
   })
 })

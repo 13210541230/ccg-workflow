@@ -12,7 +12,7 @@
 - `artifacts/`
 - `codex-sessions/`
 
-`codex-sessions/` 用于保存 `ccg-codex` MCP 的角色化会话状态与持久化输出。复杂任务中，Codex 持续对话统一通过该目录下的会话注册表复用。
+`codex-sessions/` 用于保存 `ccg-codex` MCP 的底层会话状态与持久化输出。复杂任务中，Lead 先复用上层 teammate agent，再由 teammate 复用它绑定的 Codex session。
 
 ## 四个状态文件
 
@@ -20,7 +20,7 @@
 |------|------|----------|
 | `task_plan.md` | 任务拆解、实施步骤、关键文件、回滚点 | 规划后写入，执行偏差时更新 |
 | `decisions.md` | 复杂任务的关键决策与约束 | Phase 0.8 写入，后续只读或补充 |
-| `progress.md` | 阶段状态、时间线、错误日志、会话状态 | 动态，每阶段更新 |
+| `progress.md` | 阶段状态、时间线、错误日志、teammate/session 状态 | 动态，每阶段更新 |
 | `findings.md` | 分析、规划、实施、审查、测试的关键发现 | 动态追加 |
 
 ## progress.md 模板
@@ -74,7 +74,19 @@
 | 时间 | 阶段 | 角色/会话 | 关键动作 | 结果 |
 |------|------|-----------|----------|------|
 
-## Session Registry
+## Teammate Registry
+
+| 槽位 | Subagent Type | Agent ID | Bound Session Name | Bound Session ID | 状态 | 可复用 | Last Output | 备注 |
+|------|---------------|----------|--------------------|------------------|------|--------|-------------|------|
+| analyzer-a | `ccg:codex-analyzer` | <agent_id> | <task-analyzer-a> | <session_id> | <ready/active/failed/completed> | <yes/no> | <path> | <同角色重建原因> |
+| analyzer-b | `ccg:codex-analyzer` | ... | ... | ... | ... | ... | ... | ... |
+| planner-a | `ccg:codex-planner` | ... | ... | ... | ... | ... | ... | ... |
+| planner-b | `ccg:codex-planner` | ... | ... | ... | ... | ... | ... | ... |
+| executor | `ccg:codex-executor` | ... | ... | ... | ... | ... | ... | ... |
+| reviewer-a | `ccg:codex-reviewer` | ... | ... | ... | ... | ... | ... | ... |
+| reviewer-b | `ccg:codex-reviewer` | ... | ... | ... | ... | ... | ... | ... |
+
+## Codex Session Registry
 
 | 角色 | Session Name | Session ID | Backend | Sandbox | 状态 | 可复用 | Last Output | 备注 |
 |------|--------------|------------|---------|---------|------|--------|-------------|------|
@@ -171,8 +183,9 @@
 
 ## 复用规则
 
-- 复杂任务开始后，先在 `Session Registry` 中登记各角色 `Session Name / Backend / Sandbox`
-- 首次 `codex_session_send` 成功后，立即回填 `Session ID / 状态 / Last Output`
-- 测试失败或审查回流到 Phase 3 时，默认先检查 `executor`
-- 只有当 `executor` 状态可复用且未标记失败时，才继续向同一 session 发送修复请求
-- 若某角色出现空输出、角色混用、输出损坏，应将其标记为 `可复用=no`
+- 复杂任务开始后，先在 `Teammate Registry` 中预登记各角色 `Subagent Type / Bound Session Name / Sandbox`
+- teammate 首次成功 spawn 后，立即回填 `Agent ID / 状态 / 可复用`
+- teammate 首次通过 `codex_session_send` 成功后，再回填 `Codex Session Registry` 的 `Session ID / 状态 / Last Output`
+- 测试失败或审查回流到 Phase 3 时，默认先检查 `executor` teammate，其次检查其绑定 session
+- 只有当 `executor` teammate 与其绑定 session 都可复用时，才继续向同一执行线程发送修复请求
+- 若某角色出现空输出、角色混用、输出损坏，应同时将该 teammate 和绑定 session 标记为 `可复用=no`

@@ -1,12 +1,19 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-12 (v1.8.2)
+**Last Updated**: 2026-03-12 (v1.9.0)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-12 (v1.9.0 - optional command packs + command surface reduction)
+- 新增 `/ccg:packs` 核心命令，插件用户可直接列出、安装、卸载可选扩展命令包
+- 默认发布面收口到 13 个核心命令；`workflow / feat / frontend / backend / teammate / spec-* / team-* / optimize / test / clean-branches` 改为可选 pack 或源码兼容层
+- 新增 `legacy / extras / spec / team` 四类 pack 资产，插件构建与源码安装都会生成对应 manifest 和命令模板
+- `ccg-codex` runtime 补齐 `planner` / `executor` 角色，复杂任务可直接建立对应的 Codex teammate 会话
+- 发版脚本新增 `packs/` 同步，确保 `/plugin update` 后的发布版可实际安装扩展命令
 
 ### 2026-03-12 (v1.8.2 - release pipeline fix for plugin runtime files)
 - 修复发版脚本漏同步插件根目录运行时文件的问题，`start.mjs` 与 `server.bundle.mjs` 现在会随 `.mcp.json` 一起发布到 `ccg-plugin`
@@ -139,7 +146,7 @@
 
 ## 项目愿景
 
-**CCG (Claude + Codex)** 是一个多模型协作开发系统，以 Claude Code 为编排中心，通过 Codex 双视角（逻辑 + 架构）实现多模型协作的最佳开发体验。运行时默认走 Codex，同时保留 Gemini 作为可切换后端链路。以 Claude Code Plugin 形式分发，用户通过 `/install-plugin` 一键安装 29 个斜杠命令 + 19 个专家提示词，即可使用 `/ccg:xxx` 命令。
+**CCG (Claude + Codex)** 是一个多模型协作开发系统，以 Claude Code 为编排中心，通过 Codex teammate + MCP runtime 实现稳定协作。运行时默认走 Codex，同时保留 Gemini 作为可切换后端链路。以 Claude Code Plugin 形式分发，用户通过 `/install-plugin` 安装 13 个核心命令，并可通过 `/ccg:packs` 按需启用扩展命令。
 
 ---
 
@@ -150,12 +157,12 @@ graph TD
     User["用户"] --> Plugin["/install-plugin"]
     Plugin --> Init["一键安装"]
 
-    Init --> Commands["commands/<br/>29 个命令"]
+    Init --> Commands["commands/<br/>13 个核心命令"]
     Init --> Agents["agents/<br/>6 个子智能体"]
     Init --> Prompts["prompts/<br/>19 个专家提示词"]
     Init --> Runtime["scripts + skills<br/>wrapper-free runtime"]
 
-    User2["Claude Code 用户"] --> SlashCmd["/ccg:workflow<br/>/ccg:frontend<br/>..."]
+    User2["Claude Code 用户"] --> SlashCmd["/ccg:manage<br/>/ccg:packs<br/>..."]
     SlashCmd --> Commands
 
     Commands --> Bridge["codex_bridge.py<br/>(multi-backend bridge)"]
@@ -177,7 +184,7 @@ graph TD
 
 ```mermaid
 graph TD
-    A["(根) ccg-workflow<br/>v1.8.0"] --> B["src/<br/>TypeScript CLI"]
+    A["(根) ccg-workflow<br/>v1.9.0"] --> B["src/<br/>TypeScript CLI"]
     A --> C["templates/skills/<br/>运行时 Skill"]
     A --> D["templates/<br/>命令 + 提示词"]
     A --> E["templates/plugin/scripts/<br/>运行时脚本"]

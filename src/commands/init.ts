@@ -7,7 +7,7 @@ import { homedir } from 'node:os'
 import { join } from 'pathe'
 import { i18n } from '../i18n'
 import { createDefaultConfig, ensureCcgDir, getCcgDir, readCcgConfig, writeCcgConfig } from '../utils/config'
-import { getAllCommandIds, installAceTool, installAceToolRs, installFastContext, installWorkflows } from '../utils/installer'
+import { getDefaultCommandIds, getOptionalCommandIds, installAceTool, installAceToolRs, installFastContext, installWorkflows } from '../utils/installer'
 import { migrateToV1_4_0, needsMigration } from '../utils/migration'
 
 export async function init(options: InitOptions = {}): Promise<void> {
@@ -21,7 +21,8 @@ export async function init(options: InitOptions = {}): Promise<void> {
   const frontendModels: ModelType[] = ['gemini']
   const backendModels: ModelType[] = ['codex']
   const mode: CollaborationMode = 'smart'
-  const selectedWorkflows = getAllCommandIds()
+  const selectedWorkflows = getDefaultCommandIds()
+  const optionalWorkflows = getOptionalCommandIds()
 
   // Performance mode selection
   let liteMode = false
@@ -257,7 +258,8 @@ export async function init(options: InitOptions = {}): Promise<void> {
   console.log(ansis.bold(`  ${i18n.t('init:summary.title')}`))
   console.log()
   console.log(`  ${ansis.cyan('模型路由')}  ${ansis.green('Gemini')} (前端) + ${ansis.blue('Codex')} (后端)`)
-  console.log(`  ${ansis.cyan('命令数量')}  ${ansis.yellow(selectedWorkflows.length.toString())} 个`)
+  console.log(`  ${ansis.cyan('默认命令')}  ${ansis.yellow(selectedWorkflows.length.toString())} 个`)
+  console.log(`  ${ansis.cyan('扩展命令')}  ${ansis.gray(optionalWorkflows.length.toString())} 个 ${ansis.gray('(源码保留，默认不安装)')}`)
   console.log(`  ${ansis.cyan('MCP 工具')}  ${mcpProvider === 'fast-context' ? ansis.green('fast-context') : (mcpProvider === 'ace-tool' || mcpProvider === 'ace-tool-rs') ? (aceToolToken ? ansis.green(mcpProvider) : ansis.yellow(`${mcpProvider} (待配置)`)) : ansis.gray('跳过')}`)
   console.log(`  ${ansis.cyan('Web UI')}    ${liteMode ? ansis.gray('禁用') : ansis.green('启用')}`)
   console.log(ansis.yellow('━'.repeat(50)))

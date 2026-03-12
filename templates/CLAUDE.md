@@ -2,11 +2,25 @@
 
 # Templates (命令模板 + 专家提示词 + 输出风格)
 
-**Last Updated**: 2026-03-12 (teammate command draft)
+**Last Updated**: 2026-03-12 (optional command packs)
 
 ---
 
 ## 变更记录 (Changelog)
+
+### 2026-03-12 (optional command packs)
+- 新增 `packs.md` 核心命令，用于列出、安装、卸载可选扩展包
+- 新增 `plugin/packs/manifest.template.json`，将 `legacy / extras / spec / team` 这 4 组命令构造成可安装 pack
+- `installer.ts` 现在会在源码安装时同步生成 `~/.claude/.ccg/packs/`，插件构建会生成 `dist/plugin/packs/`
+- `README.md` 更新为：插件用户通过 `/ccg:packs install <pack>` 按需启用扩展命令
+
+### 2026-03-12 (manage teammate architecture)
+- `manage.md` 改为 Lead -> `codex-analyzer|planner|executor|reviewer` teammate -> `ccg-codex` MCP 的双层结构
+- 新增 4 个角色化 teammate agent：`codex-analyzer.md`、`codex-planner.md`、`codex-executor.md`、`codex-reviewer.md`
+- `manage-state-format.md` 与 `teammate-bus-format.md` 改为双层注册表：上层 `Teammate Registry`，下层 `Codex Session Registry`
+- `workflow.md`、`feat.md`、`frontend.md`、`backend.md`、`teammate.md` 仅保留为源码兼容层，不再进入插件构建产物
+- `planner.md`、`ui-ux-designer.md`、`codex-collaborator.md`、`codex-operator.md` 仅保留为源码兼容层，不再进入默认安装和插件构建
+- `optimize.md`、`test.md`、`clean-branches.md`、`spec-*`、`team-*` 仅保留为可选扩展源码，不再进入默认插件构建
 
 ### 2026-03-12 (teammate command draft)
 - 新增 `teammate.md` 命令模板，定义 Claude Lead / 多个角色化 Codex Partner 的完整协作工作流
@@ -61,49 +75,55 @@
 
 ```
 templates/
-+-- commands/              # 29 个斜杠命令模板 -> ~/.claude/commands/ccg/
-|   +-- agents/            # 6 个子智能体 -> ~/.claude/agents/ccg/
-|   |   +-- planner.md
-|   |   +-- ui-ux-designer.md
++-- commands/              # 31 个斜杠命令模板 -> ~/.claude/commands/ccg/
+|   +-- agents/            # 10 个子智能体（其中 6 个进入默认安装/插件构建） -> ~/.claude/agents/ccg/
+|   |   +-- planner.md             # 源码兼容层，不进入默认安装/插件构建
+|   |   +-- ui-ux-designer.md      # 源码兼容层，不进入默认安装/插件构建
 |   |   +-- init-architect.md
-|   |   +-- codex-operator.md
-|   |   +-- codex-collaborator.md
+|   |   +-- codex-operator.md      # 源码兼容层，不进入默认安装/插件构建
+|   |   +-- codex-collaborator.md  # 源码兼容层，不进入默认安装/插件构建
+|   |   +-- codex-analyzer.md
+|   |   +-- codex-planner.md
+|   |   +-- codex-executor.md
+|   |   +-- codex-reviewer.md
 |   +-- get-current-datetime.md
-|   +-- workflow.md         # 完整 6 阶段工作流
+|   +-- workflow.md         # 源码兼容入口，不进入插件构建
 |   +-- plan.md             # 多模型协作规划
 |   +-- execute.md          # 多模型协作执行
-|   +-- frontend.md         # 前端专项
-|   +-- backend.md          # 后端专项
+|   +-- frontend.md         # 源码兼容入口，不进入插件构建
+|   +-- backend.md          # 源码兼容入口，不进入插件构建
 |   +-- codex.md            # 运行时直连后端
-|   +-- feat.md             # 智能功能开发
+|   +-- packs.md            # 扩展包管理
+|   +-- feat.md             # 源码兼容入口，不进入插件构建
 |   +-- analyze.md          # 技术分析
 |   +-- debug.md            # 问题诊断
-|   +-- optimize.md         # 性能优化
-|   +-- test.md             # 测试生成
+|   +-- optimize.md         # 可选扩展源码，不进入插件构建
+|   +-- test.md             # 可选扩展源码，不进入插件构建
 |   +-- review.md           # 代码审查
 |   +-- enhance.md          # Prompt 增强
 |   +-- init.md             # 项目初始化
 |   +-- commit.md           # Git 智能提交
 |   +-- rollback.md         # Git 回滚
-|   +-- clean-branches.md   # Git 清理分支
+|   +-- clean-branches.md   # 可选扩展源码，不进入插件构建
 |   +-- worktree.md         # Git Worktree
-|   +-- spec-init.md        # OpenSpec 初始化
-|   +-- spec-research.md    # 需求研究
-|   +-- spec-plan.md        # 零决策规划
-|   +-- spec-impl.md        # 规范驱动实现
-|   +-- spec-review.md      # 归档前审查
-|   +-- team-research.md    # Agent Teams 需求研究
-|   +-- team-plan.md        # Agent Teams 规划
-|   +-- team-exec.md        # Agent Teams 并行实施
-|   +-- team-review.md      # Agent Teams 审查
-|   +-- teammate.md         # Claude/Codex 多角色多会话协作
-+-- prompts/               # 19 个专家提示词 -> ~/.claude/.ccg/prompts/
-|   +-- codex/             # 6 个 Codex 角色
-|   |   +-- analyzer.md / architect.md / debugger.md / optimizer.md / reviewer.md / tester.md
-|   +-- gemini/            # 7 个 Gemini 角色
-|   |   +-- analyzer.md / architect.md / debugger.md / frontend.md / optimizer.md / reviewer.md / tester.md
-|   +-- claude/            # 6 个 Claude 角色
-|       +-- analyzer.md / architect.md / debugger.md / optimizer.md / reviewer.md / tester.md
+|   +-- spec-init.md        # 可选扩展源码，不进入插件构建
+|   +-- spec-research.md    # 可选扩展源码，不进入插件构建
+|   +-- spec-plan.md        # 可选扩展源码，不进入插件构建
+|   +-- spec-impl.md        # 可选扩展源码，不进入插件构建
+|   +-- spec-review.md      # 可选扩展源码，不进入插件构建
+|   +-- team-research.md    # 可选扩展源码，不进入插件构建
+|   +-- team-plan.md        # 可选扩展源码，不进入插件构建
+|   +-- team-exec.md        # 可选扩展源码，不进入插件构建
+|   +-- team-review.md      # 可选扩展源码，不进入插件构建
+|   +-- teammate.md         # 源码兼容入口，不进入插件构建
+|   +-- validation-probe.md # Validation-only probe (excluded from CLI installer and plugin build)
++-- prompts/               # 25 个专家提示词 -> ~/.claude/.ccg/prompts/
+|   +-- codex/             # 8 个 Codex 角色
+|   |   +-- analyzer.md / architect.md / debugger.md / executor.md / optimizer.md / planner.md / reviewer.md / tester.md
+|   +-- gemini/            # 9 个 Gemini 角色
+|   |   +-- analyzer.md / architect.md / debugger.md / executor.md / frontend.md / optimizer.md / planner.md / reviewer.md / tester.md
+|   +-- claude/            # 8 个 Claude 角色
+|       +-- analyzer.md / architect.md / debugger.md / executor.md / optimizer.md / planner.md / reviewer.md / tester.md
 +-- output-styles/         # 5 个输出风格 -> ~/.claude/output-styles/
 |   +-- abyss-cultivator.md
 |   +-- engineer-professional.md
@@ -111,6 +131,7 @@ templates/
 |   +-- nekomata-engineer.md
 |   +-- ojousama-engineer.md
 +-- skills/                # Codex runtime Skill
++-- plugin/packs/          # 可选命令包定义与 manifest 模板
 ```
 
 ---
@@ -164,12 +185,12 @@ team-research / team-plan / team-exec / team-review
 
 | 模型 | 数量 | 角色列表 |
 |------|------|----------|
-| Codex | 6 | analyzer / architect / debugger / optimizer / reviewer / tester |
-| Gemini | 7 | analyzer / architect / debugger / frontend / optimizer / reviewer / tester |
-| Claude | 6 | analyzer / architect / debugger / optimizer / reviewer / tester |
-| **合计** | **19** | |
+| Codex | 8 | analyzer / architect / debugger / executor / optimizer / planner / reviewer / tester |
+| Gemini | 9 | analyzer / architect / debugger / executor / frontend / optimizer / planner / reviewer / tester |
+| Claude | 8 | analyzer / architect / debugger / executor / optimizer / planner / reviewer / tester |
+| **合计** | **25** | |
 
 ---
 
 **扫描覆盖率**: 100%
-**最后更新**: 2026-02-25
+**最后更新**: 2026-03-12
