@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.12.0] - 2026-03-12
+
+### ✨ 新功能
+
+- **`/ccg:manage` 新增外部流程协议文件**：任务目录现在显式维护 `runtime-protocol.md` 与 `phase-gate.md`，将长期铁律、阶段允许动作、禁止动作、Hard Stop 与恢复顺序落盘，降低超大任务上下文压缩后遗忘 manage 流程的风险
+- **新增 `manage-runtime-protocol.md` / `manage-phase-gates.md` 共享模板**：统一描述 reboot 顺序、8 项 Reboot Check、验证先于完成、失败升级梯度，以及各阶段的 gate 合同
+
+### ♻️ 重构
+
+- **`manage.md` 进一步轻量化**：从长篇流程说明收口为编排入口，改为启动时优先读取任务目录中的本地协议副本；阶段切换要求 `progress.md` 与 `phase-gate.md` 同步更新
+
+### 🐛 修复
+
+- **manage hook 恢复提醒增强**：`manage-pre-task.sh` / `manage-post-task.sh` 现在会注入当前阶段、下一合法动作、禁止动作、Hard Stop 和必读文件，避免自动压缩后只记得任务进度却忘记 `manage.md` 流程纪律
+- **修复状态格式缺少流程协议层**：`manage-state-format.md` 现在明确把 `runtime-protocol.md` / `phase-gate.md` 纳入任务目录，并定义恢复一致性要求
+
+---
+
 ## [1.11.0] - 2026-03-12
 
 ### ✨ 新功能

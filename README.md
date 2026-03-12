@@ -213,6 +213,7 @@ Claude Lead
 ```
 
 主 Agent 只负责编排、验证和裁决，不直接修改产品源码。简单任务会派发给单个 worker agent；复杂任务默认走角色化 subagent，再由该 worker 复用底层 Codex session。`TeamCreate` 仅保留给显式 Team 模式或通用并行 worker 场景。
+超大型 `/ccg:manage` 任务会把流程铁律和阶段合同落到任务目录中的 `runtime-protocol.md` 与 `phase-gate.md`，用于会话压缩或恢复后的快速重载。
 
 ## Agent 状态
 

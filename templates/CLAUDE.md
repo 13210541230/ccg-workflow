@@ -2,22 +2,35 @@
 
 # Templates (命令模板 + 专家提示词 + 输出风格)
 
-**Last Updated**: 2026-03-12 (optional command packs)
+**Last Updated**: 2026-03-12 (manage runtime protocol + phase gates)
 
 ---
 
 ## 变更记录 (Changelog)
+
+### 2026-03-12 (manage runtime protocol + phase gates)
+- `manage.md` 改为：启动或恢复时优先读取任务目录中的 `runtime-protocol.md` / `phase-gate.md` / `progress.md` / `findings.md`
+- 新增共享模板 `shared/manage-runtime-protocol.md` 与 `shared/manage-phase-gates.md`，把长期流程铁律与阶段 gate 合同外置
+- `manage-state-format.md` 现在把 `runtime-protocol.md` / `phase-gate.md` 纳入任务目录，并定义恢复一致性要求
+- `manage-pre-task.sh` / `manage-post-task.sh` 注入当前阶段、下一合法动作、禁止动作、Hard Stop 与恢复必读文件
+
+### 2026-03-12 (manage runtime fallback)
+- `manage.md` 改为：复杂任务默认通过 `ccg:codex-*` subagent 加载角色定义并与 `ccg-codex` MCP 协作
+- `TeamCreate` 从默认复杂路径降为可选实验路径；仅在显式 Team 模式下要求 `Team Name / Team Lead Name / Teammate Name`
+- `manage-state-format.md` 将 `Teammate Registry` 收口为 `Codex Worker Registry`，新增 `Runtime Mode`
+- `README.md` 同步更新默认架构描述：简单任务单 worker，复杂任务默认 subagent，Team 仅可选
 
 ### 2026-03-12 (optional command packs)
 - 新增 `packs.md` 核心命令，用于列出、安装、卸载可选扩展包
 - 新增 `plugin/packs/manifest.template.json`，将 `legacy / extras / spec / team` 这 4 组命令构造成可安装 pack
 - `installer.ts` 现在会在源码安装时同步生成 `~/.claude/.ccg/packs/`，插件构建会生成 `dist/plugin/packs/`
 - `README.md` 更新为：插件用户通过 `/ccg:packs install <pack>` 按需启用扩展命令
+- `manage.md` 修正为：主 Agent 永不直接修改源码；简单任务也必须派发给单 worker agent，而不是由 Lead 自己完成
 
 ### 2026-03-12 (manage teammate architecture)
-- `manage.md` 改为 Lead -> `codex-analyzer|planner|executor|reviewer` teammate -> `ccg-codex` MCP 的双层结构
+- `manage.md` 改为 Lead -> `codex-analyzer|planner|executor|reviewer` worker -> `ccg-codex` MCP 的双层结构
 - 新增 4 个角色化 teammate agent：`codex-analyzer.md`、`codex-planner.md`、`codex-executor.md`、`codex-reviewer.md`
-- `manage-state-format.md` 与 `teammate-bus-format.md` 改为双层注册表：上层 `Teammate Registry`，下层 `Codex Session Registry`
+- `manage-state-format.md` 与 `teammate-bus-format.md` 改为双层注册表：上层 worker/teammate 注册表，下层 `Codex Session Registry`
 - `workflow.md`、`feat.md`、`frontend.md`、`backend.md`、`teammate.md` 仅保留为源码兼容层，不再进入插件构建产物
 - `planner.md`、`ui-ux-designer.md`、`codex-collaborator.md`、`codex-operator.md` 仅保留为源码兼容层，不再进入默认安装和插件构建
 - `optimize.md`、`test.md`、`clean-branches.md`、`spec-*`、`team-*` 仅保留为可选扩展源码，不再进入默认插件构建
@@ -38,7 +51,7 @@
 - `manage` 不再把 Codex 连续对话建立在 agent resume 文本协议上，而是建立在持久化 MCP session 工具上
 
 ### 2026-03-12 (manage routing hardening)
-- `manage.md` 强化为：复杂任务先尝试 `TeamCreate`，Phase 3 复杂代码修改优先 `ccg:codex-collaborator`
+- `manage.md` 曾强化为：复杂任务先尝试 `TeamCreate`，Phase 3 复杂代码修改优先 `ccg:codex-collaborator`
 - `analyze/plan/review/execute-worker` 补充 Codex 超时/空输出处理规则，禁止静默降级为 Agent 自行补做
 - `execute-worker` 明确复杂跨文件修改属于 Codex-agent 路径，普通 worker 不得硬做
 - `manage.md` / `manage-state-format.md` 新增 Phase 3 Worker Registry，测试失败或审查回流时优先 resume 原实施 worker，避免重复分析上下文
