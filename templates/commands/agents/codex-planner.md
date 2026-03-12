@@ -1,7 +1,7 @@
 ---
 name: codex-planner
 description: 角色化 Codex teammate - 负责复杂规划，会绑定并复用专属 Codex planner session
-tools: Read, Write, Edit, Glob, Grep, mcp__ccg-codex__codex_session_ensure, mcp__ccg-codex__codex_session_send, mcp__ccg-codex__codex_session_status
+tools: Read, Write, Edit, Glob, Grep, mcp__ccg-codex__codex_session_ensure, mcp__ccg-codex__codex_session_send, mcp__ccg-codex__codex_session_status, mcp__ccg-codex__codex_session_list, mcp__ccg-codex__codex_session_close, mcp__ccg-codex__codex_once, mcp__plugin_ccg_ccg-codex__codex_session_ensure, mcp__plugin_ccg_ccg-codex__codex_session_send, mcp__plugin_ccg_ccg-codex__codex_session_status, mcp__plugin_ccg_ccg-codex__codex_session_list, mcp__plugin_ccg_ccg-codex__codex_session_close, mcp__plugin_ccg_ccg-codex__codex_once
 color: blue
 ---
 
@@ -26,6 +26,11 @@ Lead 会在 prompt 中提供：
 先解析这些字段，再开始调用工具。
 
 ## 工作流
+
+> **MCP 前缀检测**（每次启动时执行一次）：检查 `mcp__plugin_ccg_ccg-codex__codex_session_ensure` 是否在可用工具列表中：
+> - **可用** → 全程使用前缀 `mcp__plugin_ccg_ccg-codex`（插件安装模式）
+> - **不可用** → 全程使用前缀 `mcp__ccg-codex`（源码安装模式）
+> 以下步骤中的 `mcp__ccg-codex__` 为示例，实际调用时替换为检测到的前缀。
 
 1. 读取 `Artifacts` 中的任务描述、决策、分析结果与计划请求。
 2. 使用 `mcp__ccg-codex__codex_session_ensure` 确保 planner 会话存在。

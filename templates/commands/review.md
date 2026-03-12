@@ -32,15 +32,26 @@ description: '多模型代码审查：无参数时自动审查 git diff，双模
 
 ## 执行工作流
 
-### 🔍 阶段 1：获取待审查代码
+### 🔍 阶段 1：确定审查范围
 
 `[模式：研究]`
 
-**无参数时**：执行 `git diff HEAD` 和 `git status --short`
+1. **无参数时**：
+   ```bash
+   BASE_SHA=$(git rev-parse origin/main 2>/dev/null || git rev-parse HEAD~1)
+   HEAD_SHA=$(git rev-parse HEAD)
+   git diff $BASE_SHA $HEAD_SHA --stat
+   ```
+   使用 BASE_SHA → HEAD_SHA 作为精确审查范围（避免 HEAD 歧义）
 
-**有参数时**：使用指定的代码/描述
+2. **有参数时**：使用指定代码/描述，跳过 git 操作
 
-调用 `{{MCP_SEARCH_TOOL}}` 获取相关上下文。
+3. 调用 `{{MCP_SEARCH_TOOL}}` 获取变更文件的相关上下文
+
+4. **审查范围确认**（输出一行）：
+   ```
+   审查范围：BASE_SHA[前8位]..HEAD_SHA[前8位]，涉及 N 个文件，+X/-Y 行
+   ```
 
 ### 🔬 阶段 2：并行审查
 
@@ -144,6 +155,27 @@ description: '多模型代码审查：无参数时自动审查 git diff，双模
 - 是否可合并：[是/否/需修复后]
 ```
 
+### ⛔ 阶段 4.5：Critical 问题处置（Hard Stop）
+
+`[模式：执行门控]`
+
+1. 统计 Critical 问题数量：
+   - **0 个 Critical**：可直接向用户报告"审查通过，可合并"
+   - **≥ 1 个 Critical**：**必须停止并报告**，禁止输出"审查通过"
+
+2. 对每个 Critical 问题：
+   ```
+   [CRITICAL #N] <问题描述>
+   文件：<path:line>
+   必须修复：<具体修复方案>
+   ```
+
+3. 询问用户："是否立即修复上述 Critical 问题？(Y/N)"
+   - Y → spawn execute-worker 或直接修复，修复后重新运行 `git diff` 验证
+   - N → 输出"审查结果：存在未修复 Critical 问题，不建议合并"并终止
+
+**⚠️ 禁止在 Critical 问题未处置前输出任何形式的"审查通过"或"可以合并"**
+
 ---
 
 ## 关键规则
@@ -151,3 +183,5 @@ description: '多模型代码审查：无参数时自动审查 git diff，双模
 1. **无参数 = 审查 git diff** – 自动获取当前变更
 2. **五层交叉验证** – Codex 双模型 + comprehensive-review 三维度
 3. 外部模型对文件系统**零写入权限**
+4. **交付前验证** – 每次输出审查结论前，必须确认已运行验证命令并看到实际输出，禁止使用"应该通过"/"看起来正确"等推测性措辞
+5. **SHA 锚定** – 每次审查必须记录 BASE_SHA 和 HEAD_SHA，确保审查范围可追溯

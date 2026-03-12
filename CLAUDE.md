@@ -1,12 +1,18 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-12 (v1.9.0)
+**Last Updated**: 2026-03-12 (v1.10.0)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-12 (v1.10.0 - teammate MCP fix + command enhancement)
+- 修复 codex-* teammate agent 无法真正调用 Codex 的问题：所有 4 个角色化 Agent 现在显式声明双前缀 MCP 工具（`mcp__ccg-codex__*` + `mcp__plugin_ccg_ccg-codex__*`），兼容 Claude Code 2.1.30+ 新要求
+- 补齐缺失的 3 个 MCP 工具声明（`codex_session_list` / `codex_session_close` / `codex_once`），每个 Agent 新增运行时前缀检测说明
+- 新增 `code-simplifier` 专用简化子 Agent
+- 增强 10 个命令模板：debug（可重现性门控 + L1-L4 止损）、plan（方案探索阶段）、test（TDD/Red-Green 路由）、feat（brainstorming 预处理）、review（SHA 锚定 + Critical 门控）、manage（Worker 升级协议 + 2-action 存盘规则）、execute（自检门控 + 阻塞协议）、commit（预提交测试 + 分支安全）、worktree（并行 Agent 模式）、optimize（简化路由）
 
 ### 2026-03-12 (v1.9.0 - optional command packs + command surface reduction)
 - 新增 `/ccg:packs` 核心命令，插件用户可直接列出、安装、卸载可选扩展命令包

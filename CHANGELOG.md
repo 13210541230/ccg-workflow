@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.10.0] - 2026-03-12
+
+### ✨ 新功能
+
+- **codex-* teammate 修复**：所有 4 个角色化 teammate agent（`codex-analyzer` / `codex-planner` / `codex-executor` / `codex-reviewer`）现在显式声明 `ccg-codex` MCP 工具的双前缀变体（`mcp__ccg-codex__*` + `mcp__plugin_ccg_ccg-codex__*`），修复 Claude Code 2.1.30+ 要求自定义 Agent 必须显式声明 MCP 工具才能继承的问题，teammate 现在可以真正调用底层 Codex 会话
+- **新增 `code-simplifier` agent**：专用代码简化子 Agent，聚焦 `/ccg:optimize` 的简化路由场景
+- **`/ccg:debug` 增强**：新增可重现性门控（Phase 0）、结构化模式分析阶段（Phase 3.5）、修复尝试计数器（`FIX_ATTEMPTS`）及 L1-L4 止损升级协议
+- **`/ccg:plan` 增强**：新增 executor-hint header 提示、小粒度规划规则、方案探索阶段（Phase 1.4.5）
+- **`/ccg:test` 增强**：新增 TDD/补充测试路由门控、Red Phase（Phase 1.5）、Red-Green 循环
+- **`/ccg:feat` 增强**：新增 brainstorming 预处理阶段 + manage 自动切换协议
+- **`/ccg:review` 增强**：新增 SHA 锚定审查范围、Critical 修复门控（Phase 4.5）、三层验证规则
+- **`/ccg:manage` 增强**：新增 Worker L1-L4 升级协议、2-action 存盘规则、Read-Before-Decide 规则、域隔离预检、新建 executor 提示规范
+- **`/ccg:execute` 增强**：新增强制自检门控、阻塞停止协议、Phase 5 审查循环上限
+- **`/ccg:commit` 增强**：新增预提交测试门控（Phase 3.5）、分支安全检查、提交后完成选项（Phase 6）
+- **`/ccg:worktree` 增强**：新增并行 Agent worktree 模式、迁移冲突警告
+- **`/ccg:optimize` 增强**：新增代码简化路由、结构化 before/after 验证
+
+### 🐛 修复
+
+- **修复 teammate MCP 工具未继承**：根因是 Claude Code 2.1.30+ 要求自定义 Agent 必须在 `tools:` 前缀中同时声明两种 MCP 命名空间；补齐 3 个缺失工具（`codex_session_list` / `codex_session_close` / `codex_once`），并为每个 Agent 工作流添加运行时 MCP 前缀检测说明
+- **修复 background subagent MCP 继承丢失**：`/ccg:manage` 复杂路径中 teammate 不再以 background 模式运行，避免 MCP 工具在后台 Agent 中失效
+
 ## [1.9.0] - 2026-03-12
 
 ### ✨ 新功能

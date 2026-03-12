@@ -74,17 +74,23 @@
 | 时间 | 阶段 | 角色/会话 | 关键动作 | 结果 |
 |------|------|-----------|----------|------|
 
+## Team Registry
+
+| Team Name | Team Lead Name | 状态 | 创建时间 | 清理时间 | 备注 |
+|-----------|----------------|------|----------|----------|------|
+| `<task-name>-codex-team` | `<team-lead>` | `<created|active|cleanup-failed|deleted>` | <timestamp> | <timestamp> | <失败原因或补充说明> |
+
 ## Teammate Registry
 
-| 槽位 | Subagent Type | Agent ID | Bound Session Name | Bound Session ID | 状态 | 可复用 | Last Output | 备注 |
-|------|---------------|----------|--------------------|------------------|------|--------|-------------|------|
-| analyzer-a | `ccg:codex-analyzer` | <agent_id> | <task-analyzer-a> | <session_id> | <ready/active/failed/completed> | <yes/no> | <path> | <同角色重建原因> |
-| analyzer-b | `ccg:codex-analyzer` | ... | ... | ... | ... | ... | ... | ... |
-| planner-a | `ccg:codex-planner` | ... | ... | ... | ... | ... | ... | ... |
-| planner-b | `ccg:codex-planner` | ... | ... | ... | ... | ... | ... | ... |
-| executor | `ccg:codex-executor` | ... | ... | ... | ... | ... | ... | ... |
-| reviewer-a | `ccg:codex-reviewer` | ... | ... | ... | ... | ... | ... | ... |
-| reviewer-b | `ccg:codex-reviewer` | ... | ... | ... | ... | ... | ... | ... |
+| 槽位 | Team Name | Teammate Name | Team-Agent Type | Agent ID | Bound Session Name | Bound Session ID | 状态 | 可复用 | Last Output | 备注 |
+|------|-----------|---------------|-----------------|----------|--------------------|------------------|------|--------|-------------|------|
+| analyzer-a | `<task-name>-codex-team` | `analyzer-a` | `ccg:codex-analyzer` | <agent_id> | <task-analyzer-a> | <session_id> | <ready/active/failed/completed> | <yes/no> | <path> | <同角色重建原因> |
+| analyzer-b | `<task-name>-codex-team` | `analyzer-b` | `ccg:codex-analyzer` | ... | ... | ... | ... | ... | ... | ... |
+| planner-a | `<task-name>-codex-team` | `planner-a` | `ccg:codex-planner` | ... | ... | ... | ... | ... | ... | ... |
+| planner-b | `<task-name>-codex-team` | `planner-b` | `ccg:codex-planner` | ... | ... | ... | ... | ... | ... | ... |
+| executor | `<task-name>-codex-team` | `executor` | `ccg:codex-executor` | ... | ... | ... | ... | ... | ... | ... |
+| reviewer-a | `<task-name>-codex-team` | `reviewer-a` | `ccg:codex-reviewer` | ... | ... | ... | ... | ... | ... | ... |
+| reviewer-b | `<task-name>-codex-team` | `reviewer-b` | `ccg:codex-reviewer` | ... | ... | ... | ... | ... | ... | ... |
 
 ## Codex Session Registry
 
@@ -183,9 +189,11 @@
 
 ## 复用规则
 
-- 复杂任务开始后，先在 `Teammate Registry` 中预登记各角色 `Subagent Type / Bound Session Name / Sandbox`
+- 复杂任务开始后，必须先成功创建 `Team Name / Team Lead Name`
+- 再在 `Teammate Registry` 中预登记各角色 `Teammate Name / Team-Agent Type / Bound Session Name / Sandbox`
 - teammate 首次成功 spawn 后，立即回填 `Agent ID / 状态 / 可复用`
 - teammate 首次通过 `codex_session_send` 成功后，再回填 `Codex Session Registry` 的 `Session ID / 状态 / Last Output`
 - 测试失败或审查回流到 Phase 3 时，默认先检查 `executor` teammate，其次检查其绑定 session
 - 只有当 `executor` teammate 与其绑定 session 都可复用时，才继续向同一执行线程发送修复请求
 - 若某角色出现空输出、角色混用、输出损坏，应同时将该 teammate 和绑定 session 标记为 `可复用=no`
+- 若复杂任务里缺失 `Team Name`、`Team Lead Name` 或 `Teammate Name`，视为未正确进入 Agent Teams 路径

@@ -71,6 +71,9 @@ parent-directory/
 1. 验证源有未提交内容
 2. 确保目标干净
 3. 显示即将迁移的改动
+3.5. **分支分歧检查**：
+   - 检测目标 worktree 是否已从源分支分歧（`git log --oneline source..target` 有输出）
+   - 若有分歧：展示分歧 commit 列表，要求用户确认迁移策略（覆盖 / cherry-pick / 放弃）
 4. 安全迁移
 5. 确认结果
 
@@ -120,6 +123,29 @@ parent-directory/
 3. **环境文件** – 自动复制 `.gitignore` 中的 `.env` 文件
 4. **路径安全** – 始终使用绝对路径防止嵌套问题
 5. **分支保护** – 验证分支未被其他地方使用
+
+## 并行开发模式（与 /ccg:manage 联动）
+
+当 `/ccg:manage` 派发多个并行 executor 时，推荐为每个独立任务创建隔离 worktree：
+
+**前置检查**（派发并行 agents 前）：
+- [ ] 各 agent 的任务是否涉及不同文件集合？（若有重叠，不适合并行 worktree）
+- [ ] 每个 worktree 能否独立运行测试？
+- [ ] 合并策略是否已确定（顺序合并 / cherry-pick）？
+
+**创建步骤**：
+```bash
+/worktree add task-a -b feat/task-a
+/worktree add task-b -b feat/task-b
+```
+
+**完成后合并顺序**：
+1. 在每个 worktree 中运行测试，确保通过
+2. 按依赖顺序逐个合并到主分支
+3. 每次合并后重新运行完整测试套件
+4. 所有合并完成后运行 `/ccg:commit`
+
+**禁止**：将有文件重叠的任务分配到并行 worktree（会导致合并冲突）。
 
 ## 注意事项
 
