@@ -1,12 +1,21 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-12 (v1.10.0)
+**Last Updated**: 2026-03-12 (v1.11.0)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-12 (v1.11.0 - plugin absorption + workflow enhancement)
+- 新增 3 个 CCG 内置审查 Agent：`architect-reviewer` / `code-quality-reviewer` / `security-reviewer`，消除 `comprehensive-review` 外部插件依赖
+- `/ccg:review` Stage 2.5 subagent_type 全面切换为 `ccg:*`
+- `/ccg:manage` 12 处增强：设计探索门控、问题纪律、Open Questions 表、零上下文计划格式、执行前审查门控、批次/阻塞协议、调试纪律、验证证据表、验证先于完成协议、Read/Write 决策矩阵、5-Question Reboot Check
+- `/ccg:debug` 增强：Phase 1 扩展为 7 项协议 + 不可复现门控；Phase 5 新增 4 步修复验证 + 架构升级门控
+- `/ccg:execute` 增强：计划批判性审查（步骤 3.5）、批次执行协议、阻塞协议
+- `/ccg:plan` 增强：YAGNI 门控 + 零上下文文件规范 + TDD 5 步流程
+- 修复 `codex-*.md` agent 文件 `Edit` 工具及 `codex_once/session_list/session_close` 被误删问题
 
 ### 2026-03-12 (v1.10.0 - teammate MCP fix + command enhancement)
 - 修复 codex-* teammate agent 无法真正调用 Codex 的问题：所有 4 个角色化 Agent 现在显式声明双前缀 MCP 工具（`mcp__ccg-codex__*` + `mcp__plugin_ccg_ccg-codex__*`），兼容 Claude Code 2.1.30+ 新要求

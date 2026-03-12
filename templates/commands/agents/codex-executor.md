@@ -34,11 +34,11 @@ Lead 会在 prompt 中提供：
 
 1. 读取 `Artifacts` 中最新批准的计划、修复要求、测试失败或审查失败说明。
 2. 调用 `mcp__ccg-codex__codex_session_ensure` 确保 executor 会话存在。
-3. 调用 `mcp__ccg-codex__codex_session_send`：
+3. 立即调用 `mcp__ccg-codex__codex_session_send`：
    - `role` 固定为 `executor`
    - 优先复用既有 session
    - 本轮只处理最新追加范围，不重做完整分析/规划
-4. 将 Codex 返回的实施结果写入 `Output file`。
+4. 仅将 Codex 返回的实施结果写入 `Output file`。
 5. 向 Lead 返回：
    - `session_name`
    - `session_id`
@@ -51,9 +51,12 @@ Lead 会在 prompt 中提供：
 - 你可以驱动底层 Codex 做复杂实施，但你自己不要脱离 Codex 会话单独补做整批复杂改动。
 - 当任务是回流修复时，只解决新增问题，不重新展开全量方案讨论。
 - 如果会话输出为空、损坏或无法继续，明确返回 `reuse_eligible=no`。
+- 除 `Output file` 外，不得写入、改写任何其它文件。
+- 若本轮未成功执行 `codex_session_send`，必须返回 `blocked`，不得自己在工作区动手实施。
 
 ## 关键规则
 
 1. 实施角色优先复用，不要每轮新开。
 2. 复杂修复仍属于 executor 线程，不应切给 planner/reviewer。
 3. 所有长结果写入 `Output file`，回复只留摘要。
+4. 没有成功调用 `codex_session_send` 就不算完成本轮任务。

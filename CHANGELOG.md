@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.11.0] - 2026-03-12
+
+### ✨ 新功能
+
+- **新增 3 个 CCG 内置审查 Agent**：`architect-reviewer` / `code-quality-reviewer` / `security-reviewer`，吸收 `comprehensive-review` 插件能力，消除外部插件依赖；`/ccg:review` Stage 2.5 已切换为 `ccg:*` subagent_type
+- **`/ccg:manage` 大幅增强（12 处）**：设计探索门控（Phase 0.3）、问题纪律（Phase 0.8）、Open Questions 表（Phase 0.5）、零上下文计划格式（Phase 2.1/2.2）、执行前审查门控（Phase 3）、批次/阻塞协议、调试纪律、验证证据表（Phase 5）、验证先于完成协议（新独立章节）、Read/Write 决策矩阵、5-Question Reboot Check
+- **`/ccg:debug` 增强**：Phase 1 上下文收集扩展为 7 项协议（含完整错误阅读、近期变更、不可复现门控）；Phase 5 新增 4 步修复验证 + 架构问题升级门控
+- **`/ccg:execute` 增强**：新增计划批判性审查步骤（3.5）、自检门控强化、批次执行协议（每批 3 步）、阻塞协议
+- **`/ccg:plan` 增强**：新增 YAGNI 门控、零上下文文件规范、TDD 5 步流程
+
+### 🐛 修复
+
+- `templates/commands/agents/codex-*.md`：修复 `Edit` 工具及 `codex_once`/`codex_session_list`/`codex_session_close` 被误删问题，恢复完整工具声明
+
+---
+
 ## [1.10.0] - 2026-03-12
 
 ### ✨ 新功能

@@ -7,7 +7,7 @@
 
 </div>
 
-以 Claude Code 为编排中心，协调 Codex / Gemini 进行多模型协作开发。当前默认后端仍为 Codex，复杂任务路径会优先通过 `codex-* teammate` 代理与底层 Codex 持续协作。
+以 Claude Code 为编排中心，协调 Codex / Gemini 进行多模型协作开发。当前默认后端仍为 Codex，复杂任务路径会优先通过 `codex-*` 角色化 worker 与底层 Codex 持续协作。
 
 ## 安装
 
@@ -192,17 +192,18 @@
 
 建议：
 - 普通任务直接用 `codex_once` 或 `codex_session_send`
-- 复杂协作任务让 `/ccg:manage` 或 `/ccg:teammate` 通过 `codex-* teammate` 编排，Lead 不直接维护复杂 session
+- 复杂协作任务让 `/ccg:manage` 通过 `codex-*` worker 编排，Lead 不直接维护复杂 session
 
 ## 架构
 
 ```
 Claude Lead
     │
-    ├── codex-analyzer teammate
-    ├── codex-planner teammate
-    ├── codex-executor teammate
-    └── codex-reviewer teammate
+    ├── simple-executor
+    ├── codex-analyzer   (default: subagent)
+    ├── codex-planner    (default: subagent)
+    ├── codex-executor   (default: subagent)
+    └── codex-reviewer   (default: subagent)
              │
              ↓
         ccg-codex MCP
@@ -211,7 +212,7 @@ Claude Lead
            Codex
 ```
 
-简单任务可由 Claude 直接完成；复杂任务优先走 teammate 代理层，再由 teammate 复用底层 Codex session。
+主 Agent 只负责编排、验证和裁决，不直接修改产品源码。简单任务会派发给单个 worker agent；复杂任务默认走角色化 subagent，再由该 worker 复用底层 Codex session。`TeamCreate` 仅保留给显式 Team 模式或通用并行 worker 场景。
 
 ## Agent 状态
 

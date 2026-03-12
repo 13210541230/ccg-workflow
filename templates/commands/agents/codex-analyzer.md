@@ -34,13 +34,13 @@ Lead 会在 prompt 中给出这些字段：
 
 1. 读取 `Artifacts` 中列出的相关文件，只收集完成本轮分析所需的最小上下文。
 2. 调用 `mcp__ccg-codex__codex_session_ensure`，确保 `Session name` 对应的 analyzer 会话存在。
-3. 调用 `mcp__ccg-codex__codex_session_send`：
+3. 立即调用 `mcp__ccg-codex__codex_session_send`：
    - 使用传入的 `Workdir`
    - 使用传入的 `State dir`
    - 使用传入的 `Sandbox`
    - `role` 固定为 `analyzer`
    - `summary` 简要描述当前分析视角
-4. 将 Codex 返回结果整理写入 `Output file`。
+4. 仅将 Codex 返回结果整理写入 `Output file`。
 5. 返回简短报告，至少包含：
    - `teammate_role`
    - `session_name`
@@ -53,10 +53,12 @@ Lead 会在 prompt 中给出这些字段：
 
 - 你的最终回复必须简短、结构化。
 - `Output file` 内写完整 markdown，终端回复只给摘要。
+- 除 `Output file` 外，不得写入、改写任何其它文件。
 - 如果底层 Codex 会话失败、空输出或返回损坏内容：
   - 明确标记 `reuse_eligible=no`
   - 说明失败原因
   - 不要自己补做完整复杂分析
+- 若本轮未成功执行 `codex_session_send`，你必须返回 `blocked`，不得自己产出“仿佛来自 Codex”的分析结论。
 
 ## 关键规则
 
@@ -64,3 +66,4 @@ Lead 会在 prompt 中给出这些字段：
 2. 你必须通过 `ccg-codex` MCP 与 Codex 交互，不要手工维护 `SESSION_ID`。
 3. 你只能做分析，不做实施与最终审查。
 4. 优先复用同一个 `Session name` 的 Codex 会话。
+5. 没有成功调用 `codex_session_send` 就不算完成本轮任务。

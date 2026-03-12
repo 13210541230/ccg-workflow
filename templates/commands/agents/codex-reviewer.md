@@ -34,10 +34,10 @@ Lead 会在 prompt 中提供：
 
 1. 读取 `Artifacts` 中的 diff、计划、审查请求与必要上下文。
 2. 用 `mcp__ccg-codex__codex_session_ensure` 绑定 reviewer 会话。
-3. 用 `mcp__ccg-codex__codex_session_send`：
+3. 立即用 `mcp__ccg-codex__codex_session_send`：
    - `role` 固定为 `reviewer`
    - 聚焦 correctness / safety / maintainability / regression risk
-4. 将结构化审查结果写入 `Output file`。
+4. 仅将结构化审查结果写入 `Output file`。
 5. 返回简短审查摘要，至少包含：
    - `session_id`
    - `output_file`
@@ -49,9 +49,12 @@ Lead 会在 prompt 中提供：
 - 审查结果按严重级别分组。
 - 不要替 executor 直接改代码。
 - 如果发现计划层问题，可以指出，但不要直接转成 planner。
+- 除 `Output file` 外，不得写入、改写任何其它文件。
+- 若本轮未成功执行 `codex_session_send`，必须返回 `blocked`，不得自行产出仿真审查结果。
 
 ## 关键规则
 
 1. 审查角色只产出审查意见，不实施修复。
 2. 优先复用既有 reviewer session。
 3. 会话异常时显式返回失败，不静默降级。
+4. 没有成功调用 `codex_session_send` 就不算完成本轮任务。

@@ -77,12 +77,12 @@ description: '多模型代码审查：无参数时自动审查 git diff，双模
 
 `[模式：深度审查]`
 
-**在等待 Codex 结果返回的同时**，并行 spawn 三个 comprehensive-review 子Agent 进行本地深度审查：
+**在等待 Codex 结果返回的同时**，并行 spawn 三个 CCG 审查子Agent 进行本地深度审查：
 
 1. **架构审查**：
    ```
    Task({
-     subagent_type: "comprehensive-review:architect-review",
+     subagent_type: "ccg:architect-reviewer",
      prompt: "审查以下代码变更，关注架构模式、可扩展性、模块耦合度、依赖方向：\n\n<git diff 内容或变更描述>",
      description: "架构维度审查",
      run_in_background: true
@@ -92,7 +92,7 @@ description: '多模型代码审查：无参数时自动审查 git diff，双模
 2. **安全审计**：
    ```
    Task({
-     subagent_type: "comprehensive-review:security-auditor",
+     subagent_type: "ccg:security-reviewer",
      prompt: "审查以下代码变更，关注 OWASP Top 10、注入风险、认证授权、敏感数据处理：\n\n<git diff 内容或变更描述>",
      description: "安全维度审计",
      run_in_background: true
@@ -102,25 +102,25 @@ description: '多模型代码审查：无参数时自动审查 git diff，双模
 3. **代码质量审查**：
    ```
    Task({
-     subagent_type: "comprehensive-review:code-reviewer",
+     subagent_type: "ccg:code-quality-reviewer",
      prompt: "审查以下代码变更，关注代码复杂度、错误处理、性能问题、测试覆盖、可维护性：\n\n<git diff 内容或变更描述>",
      description: "代码质量审查",
      run_in_background: true
    })
    ```
 
-**注意**：这三个审查与阶段 2 的 Codex 双模型审查**并行执行**（均设置 `run_in_background: true`）。等待全部 5 个审查结果（2 个 Codex + 3 个 comprehensive-review）返回后，进入阶段 3。
+**注意**：这三个审查与阶段 2 的 Codex 双模型审查**并行执行**（均设置 `run_in_background: true`）。等待全部 5 个审查结果（2 个 Codex + 3 个 CCG 审查子Agent）返回后，进入阶段 3。
 
 ### 🔀 阶段 3：五层综合反馈
 
 `[模式：综合]`
 
-1. 收集全部审查结果（Codex 双模型 + comprehensive-review 三维度 = 五层）
+1. 收集全部审查结果（Codex 双模型 + CCG 审查子Agent 三维度 = 五层）
 2. **去重合并**：同一问题被多个审查者发现时，保留最详细的描述，标注发现来源
 3. **严重程度校准**：按 Critical / Major / Minor / Suggestion 统一分级
 4. **交叉验证**：
    - Codex-A 与 Codex-B 一致的结论 → 强信号
-   - comprehensive-review 独立发现的问题 → 补充维度
+   - CCG 审查子Agent 独立发现的问题 → 补充维度
    - 仅单一来源的 Critical → 需二次确认
 
 ### 📊 阶段 4：呈现审查结果
@@ -138,9 +138,9 @@ description: '多模型代码审查：无参数时自动审查 git diff，双模
 |------|------|------|
 | Codex-A | 安全/性能/错误处理 | ✅ |
 | Codex-B | 架构/设计一致性 | ✅ |
-| architect-review | 架构模式/可扩展性 | ✅ |
-| security-auditor | OWASP/注入/认证 | ✅ |
-| code-reviewer | 复杂度/测试/性能 | ✅ |
+| architect-reviewer | 架构模式/可扩展性 | ✅ |
+| security-reviewer | OWASP/注入/认证 | ✅ |
+| code-quality-reviewer | 复杂度/测试/性能 | ✅ |
 
 ### 关键问题 (Critical)
 > 必须修复才能合并
@@ -181,7 +181,7 @@ description: '多模型代码审查：无参数时自动审查 git diff，双模
 ## 关键规则
 
 1. **无参数 = 审查 git diff** – 自动获取当前变更
-2. **五层交叉验证** – Codex 双模型 + comprehensive-review 三维度
+2. **五层交叉验证** – Codex 双模型 + CCG 审查子Agent 三维度
 3. 外部模型对文件系统**零写入权限**
 4. **交付前验证** – 每次输出审查结论前，必须确认已运行验证命令并看到实际输出，禁止使用"应该通过"/"看起来正确"等推测性措辞
 5. **SHA 锚定** – 每次审查必须记录 BASE_SHA 和 HEAD_SHA，确保审查范围可追溯

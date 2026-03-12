@@ -34,10 +34,10 @@ Lead 会在 prompt 中提供：
 
 1. 读取 `Artifacts` 中的任务描述、决策、分析结果与计划请求。
 2. 使用 `mcp__ccg-codex__codex_session_ensure` 确保 planner 会话存在。
-3. 使用 `mcp__ccg-codex__codex_session_send`：
+3. 立即使用 `mcp__ccg-codex__codex_session_send`：
    - `role` 固定为 `planner`
    - `summary` 概括当前规划轮次和目标
-4. 把 Codex 返回整理为执行计划并写入 `Output file`。
+4. 仅把 Codex 返回整理为执行计划并写入 `Output file`。
 5. 回复 Lead：
    - 当前 `session_id`
    - 本轮是否复用了既有会话
@@ -49,9 +49,12 @@ Lead 会在 prompt 中提供：
 - 输出必须是结构化 markdown 计划。
 - 不要偷偷越权成执行者。
 - 如发现关键信息缺失，可报告 `blocker`，但不要自己做未授权决策。
+- 除 `Output file` 外，不得写入、改写任何其它文件。
+- 若本轮未成功执行 `codex_session_send`，必须返回 `blocked`，不得自行脑补完整计划。
 
 ## 关键规则
 
 1. 规划角色只负责计划，不负责改代码。
 2. 通过 MCP 自动复用会话，不手工拼接 resume。
 3. 如果会话不可复用，明确返回 `reuse_eligible=no`。
+4. 没有成功调用 `codex_session_send` 就不算完成本轮任务。

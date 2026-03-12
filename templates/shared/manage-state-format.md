@@ -12,7 +12,7 @@
 - `artifacts/`
 - `codex-sessions/`
 
-`codex-sessions/` 用于保存 `ccg-codex` MCP 的底层会话状态与持久化输出。复杂任务中，Lead 先复用上层 teammate agent，再由 teammate 复用它绑定的 Codex session。
+`codex-sessions/` 用于保存 `ccg-codex` MCP 的底层会话状态与持久化输出。复杂任务中，Lead 先复用上层 codex worker，再由 worker 复用它绑定的 Codex session。默认运行时是 `subagent`；只有显式 Team 模式才会额外创建 Agent Team。
 
 ## 四个状态文件
 
@@ -20,7 +20,7 @@
 |------|------|----------|
 | `task_plan.md` | 任务拆解、实施步骤、关键文件、回滚点 | 规划后写入，执行偏差时更新 |
 | `decisions.md` | 复杂任务的关键决策与约束 | Phase 0.8 写入，后续只读或补充 |
-| `progress.md` | 阶段状态、时间线、错误日志、teammate/session 状态 | 动态，每阶段更新 |
+| `progress.md` | 阶段状态、时间线、错误日志、worker/session 状态 | 动态，每阶段更新 |
 | `findings.md` | 分析、规划、实施、审查、测试的关键发现 | 动态追加 |
 
 ## progress.md 模板
@@ -69,28 +69,42 @@
 | 时间 | 阶段 | 角色/会话 | 错误描述 | 尝试次数 | 解决方式 |
 |------|------|-----------|----------|----------|----------|
 
+`错误描述` 建议标准值包含：
+- `runtime blocked`
+- `codex bypass`
+- `empty output`
+- `session damaged`
+- `team create failed`
+- `role injection missing`
+
 ## 会话日志
 
 | 时间 | 阶段 | 角色/会话 | 关键动作 | 结果 |
 |------|------|-----------|----------|------|
 
-## Team Registry
+## Simple Worker Registry
+
+| 槽位 | Agent Type | Agent ID | 状态 | 可复用 | Last Output | 备注 |
+|------|------------|----------|------|--------|-------------|------|
+| simple-executor | `general-purpose` | <agent_id> | <ready/active/failed/completed> | <yes/no> | <path> | <升级为复杂/重建原因> |
+
+## Team Registry（仅 Team 模式使用）
 
 | Team Name | Team Lead Name | 状态 | 创建时间 | 清理时间 | 备注 |
 |-----------|----------------|------|----------|----------|------|
 | `<task-name>-codex-team` | `<team-lead>` | `<created|active|cleanup-failed|deleted>` | <timestamp> | <timestamp> | <失败原因或补充说明> |
 
-## Teammate Registry
+## Codex Worker Registry
 
-| 槽位 | Team Name | Teammate Name | Team-Agent Type | Agent ID | Bound Session Name | Bound Session ID | 状态 | 可复用 | Last Output | 备注 |
-|------|-----------|---------------|-----------------|----------|--------------------|------------------|------|--------|-------------|------|
-| analyzer-a | `<task-name>-codex-team` | `analyzer-a` | `ccg:codex-analyzer` | <agent_id> | <task-analyzer-a> | <session_id> | <ready/active/failed/completed> | <yes/no> | <path> | <同角色重建原因> |
-| analyzer-b | `<task-name>-codex-team` | `analyzer-b` | `ccg:codex-analyzer` | ... | ... | ... | ... | ... | ... | ... |
-| planner-a | `<task-name>-codex-team` | `planner-a` | `ccg:codex-planner` | ... | ... | ... | ... | ... | ... | ... |
-| planner-b | `<task-name>-codex-team` | `planner-b` | `ccg:codex-planner` | ... | ... | ... | ... | ... | ... | ... |
-| executor | `<task-name>-codex-team` | `executor` | `ccg:codex-executor` | ... | ... | ... | ... | ... | ... | ... |
-| reviewer-a | `<task-name>-codex-team` | `reviewer-a` | `ccg:codex-reviewer` | ... | ... | ... | ... | ... | ... | ... |
-| reviewer-b | `<task-name>-codex-team` | `reviewer-b` | `ccg:codex-reviewer` | ... | ... | ... | ... | ... | ... | ... |
+| 槽位 | Runtime Mode | Team Name | Teammate Name | Worker Type | Agent ID | Bound Session Name | Bound Session ID | 状态 | 可复用 | Codex Proof | Last Output | 备注 |
+|------|--------------|-----------|---------------|-------------|----------|--------------------|------------------|------|--------|-------------|-------------|------|
+| analyzer-a | `subagent` | `<optional>` | `<optional>` | `ccg:codex-analyzer` | <agent_id> | <task-analyzer-a> | <session_id> | <ready/active/failed/completed> | <yes/no> | <verified/missing> | <path> | <同角色重建原因> |
+| analyzer-b | `subagent` | `<optional>` | `<optional>` | `ccg:codex-analyzer` | ... | ... | ... | ... | ... | ... | ... | ... |
+| planner-a | `subagent` | `<optional>` | `<optional>` | `ccg:codex-planner` | ... | ... | ... | ... | ... | ... | ... | ... |
+| planner-b | `subagent` | `<optional>` | `<optional>` | `ccg:codex-planner` | ... | ... | ... | ... | ... | ... | ... | ... |
+| executor | `subagent` | `<optional>` | `<optional>` | `ccg:codex-executor` | ... | ... | ... | ... | ... | ... | ... | ... |
+| reviewer-a | `subagent` | `<optional>` | `<optional>` | `ccg:codex-reviewer` | ... | ... | ... | ... | ... | ... | ... | ... |
+| reviewer-b | `subagent` | `<optional>` | `<optional>` | `ccg:codex-reviewer` | ... | ... | ... | ... | ... | ... | ... | ... |
 
 ## Codex Session Registry
 
@@ -186,14 +200,24 @@
 - `review-a-<n>.md`
 - `review-b-<n>.md`
 - `review-failure-<n>.md`
+- `simple-request.md`
+- `simple-worker-result-<n>.md`
 
 ## 复用规则
 
-- 复杂任务开始后，必须先成功创建 `Team Name / Team Lead Name`
-- 再在 `Teammate Registry` 中预登记各角色 `Teammate Name / Team-Agent Type / Bound Session Name / Sandbox`
-- teammate 首次成功 spawn 后，立即回填 `Agent ID / 状态 / 可复用`
-- teammate 首次通过 `codex_session_send` 成功后，再回填 `Codex Session Registry` 的 `Session ID / 状态 / Last Output`
-- 测试失败或审查回流到 Phase 3 时，默认先检查 `executor` teammate，其次检查其绑定 session
-- 只有当 `executor` teammate 与其绑定 session 都可复用时，才继续向同一执行线程发送修复请求
-- 若某角色出现空输出、角色混用、输出损坏，应同时将该 teammate 和绑定 session 标记为 `可复用=no`
-- 若复杂任务里缺失 `Team Name`、`Team Lead Name` 或 `Teammate Name`，视为未正确进入 Agent Teams 路径
+- 复杂任务开始后，必须先在 `Codex Worker Registry` 中预登记各角色 `Runtime Mode / Worker Type / Bound Session Name / Sandbox`
+- 默认将 `Runtime Mode` 记录为 `subagent`
+- 只有显式 Team 模式才创建 `Team Name / Team Lead Name`，并回填 `Team Name / Teammate Name`
+- 简单任务开始后，必须先在 `Simple Worker Registry` 中登记 `simple-executor`
+- simple worker 首次成功 spawn 后，立即回填 `Agent ID / 状态 / 可复用 / Last Output`
+- codex worker 首次成功 spawn 后，立即回填 `Agent ID / 状态 / 可复用`
+- Lead 接受 codex worker 产出前，必须验证 `runtime_mode / session_id / reuse_eligible / output_file`；验证通过后再把 `Codex Proof` 标记为 `verified`
+- 若 codex worker 摘要缺少上述任一字段，则将 `Codex Proof` 标记为 `missing`，并在错误日志中记录 `codex bypass`
+- 若 `runtime_mode=team` 但缺少 `Team Name / Teammate Name`，则记录 `role injection missing`
+- codex worker 首次通过 `codex_session_send` 成功后，再回填 `Codex Session Registry` 的 `Session ID / 状态 / Last Output`
+- 简单任务测试失败或审查要求修复时，默认先检查 `simple-executor` 是否可复用
+- 测试失败或审查回流到 Phase 3 时，默认先检查 `executor` worker，其次检查其绑定 session
+- 只有当 `executor` worker 与其绑定 session 都可复用时，才继续向同一执行线程发送修复请求
+- 只有当 `simple-executor` 可复用时，才继续向同一简单执行线程发送修复请求
+- 若某角色出现空输出、角色混用、输出损坏，应同时将该 worker 和绑定 session 标记为 `可复用=no`
+- 只有 Team 模式下缺失 `Team Name`、`Team Lead Name` 或 `Teammate Name`，才视为未正确进入 Agent Teams 路径
