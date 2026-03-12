@@ -2,11 +2,17 @@
 
 # Templates (命令模板 + 专家提示词 + 输出风格)
 
-**Last Updated**: 2026-03-11 (v1.7.80)
+**Last Updated**: 2026-03-12 (manage routing hardening)
 
 ---
 
 ## 变更记录 (Changelog)
+
+### 2026-03-12 (manage routing hardening)
+- `manage.md` 强化为：复杂任务先尝试 `TeamCreate`，Phase 3 复杂代码修改优先 `ccg:codex-collaborator`
+- `analyze/plan/review/execute-worker` 补充 Codex 超时/空输出处理规则，禁止静默降级为 Agent 自行补做
+- `execute-worker` 明确复杂跨文件修改属于 Codex-agent 路径，普通 worker 不得硬做
+- `manage.md` / `manage-state-format.md` 新增 Phase 3 Worker Registry，测试失败或审查回流时优先 resume 原实施 worker，避免重复分析上下文
 
 ### 2026-03-09 (codex-operator 子Agent)
 - 新增 `codex-operator.md` 通用 Codex 代理子Agent（迭代编排，最多 5 轮）

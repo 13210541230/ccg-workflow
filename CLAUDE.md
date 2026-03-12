@@ -1,12 +1,17 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-11 (v1.7.81)
+**Last Updated**: 2026-03-12 (v1.7.82)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-12 (v1.7.82 - manage routing hardening + worker reuse)
+- `/ccg:manage` 复杂任务默认先尝试 `TeamCreate`，复杂代码修改优先 `ccg:codex-collaborator`，避免错误落到 `general-purpose`
+- `analyze-worker`、`plan-worker`、`review-worker`、`execute-worker` 补充 Codex 超时/空输出处理规则，禁止静默降级为 Agent 自行补做
+- `manage-state-format.md` 新增 Phase 3 Worker Registry；测试失败或审查回流时优先 resume 原实施 worker，避免重复分析上下文
 
 ### 2026-03-11 (v1.7.81 - manage agent-teams default + Codex escalation rules)
 - `/ccg:manage` 在 Phase 3/4 默认优先尝试 Agent Teams，仅在 TeamCreate 不可用或失败时降级

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.82] - 2026-03-12
+
+### 🐛 修复
+
+- **manage 复杂实施路由收口**：`/ccg:manage` 复杂任务默认先尝试创建 `agent-team`，复杂代码修改优先派发 `ccg:codex-collaborator`，不再错误地直接走 `general-purpose`
+- **Codex 超时降级修复**：`analyze-worker`、`plan-worker`、`review-worker`、`execute-worker` 新增阻塞/重试规则，已判定需要 Codex 时禁止静默回退为 Agent 自行分析或补做
+- **迭代修复上下文复用**：Phase 3 新增 Worker Registry，测试失败或审查 Critical 回流时优先 `resume` 原实施 worker，避免每轮重新分析上下文
+
 ## [1.7.81] - 2026-03-11
 
 ### 🐛 修复

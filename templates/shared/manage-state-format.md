@@ -60,6 +60,12 @@
 | 时间 | 阶段 | Worker | 关键动作 | 结果 |
 |------|------|--------|----------|------|
 
+## Worker Registry
+
+| 阶段 | Worker | Agent ID | Subagent Type | 状态 | Output File | CODEX_SESSION | 可复用 | 备注 |
+|------|--------|----------|---------------|------|-------------|---------------|--------|------|
+| Phase 3 | execute-worker | <agent_id> | <ccg:codex-collaborator / agent-teams:team-implementer / general-purpose> | <running/completed/failed> | <path> | <session_id> | <yes/no> | <空输出/路由变更/可用于 resume> |
+
 ## 消息日志
 
 | 时间 | 阶段 | 方向 | 消息类型 | 摘要 | 决策结果 |
@@ -124,3 +130,10 @@
 | `diff.txt` | `{{DIFF_CONTENT}}` | Phase 4 前（git diff 输出） |
 | `changed-files.txt` | `{{CHANGED_FILES}}` | Phase 5 前 |
 | `team-name.txt` | `{{TEAM_NAME}}` | Phase 3/4 Teammate 模式时 |
+
+## 复用规则
+
+- Phase 3 首次 spawn 成功后，必须立即在 `progress.md` 的 Worker Registry 记录 `Agent ID / Subagent Type / 状态 / CODEX_SESSION / 可复用`
+- 审查 Critical 或测试失败回流到 Phase 3 时，默认先检查 Worker Registry 中最近一条 Phase 3 记录
+- 只有当该记录状态为 `completed` 且 `可复用=yes` 且本轮实施路由未变化时，才允许 `resume`
+- 若记录为 `failed`、`可复用=no`、空输出、输出文件缺失、路由变化，必须新开 Agent

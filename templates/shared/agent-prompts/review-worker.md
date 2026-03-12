@@ -17,6 +17,8 @@
 
 **Codex 双模型审查模式**：按以下步骤执行。
 
+**禁止静默降级**：一旦已进入 Codex 双模型审查模式，超时、空输出、bridge 失败只允许重试或报告阻塞，**禁止**改成你自己补齐完整审查结论。
+
 ## 调用规范（Codex 模式）
 
 **步骤 0：解析 codex_bridge.py 路径**
@@ -62,6 +64,11 @@ TaskOutput({ task_id: "<codex_a_task_id>", block: true, timeout: 600000 })
 TaskOutput({ task_id: "<codex_b_task_id>", block: true, timeout: 600000 })
 
 输出丢失检测：同 analyze-worker 步骤。
+
+超时/失败恢复（必须执行）：
+- 第 1 次失败：收窄 diff 片段或改用 `--prompt-file` 重试
+- 第 2 次失败：新建会话重试一次，并记录失败原因
+- 连续 2 次仍失败：输出 `Codex blocked`，仅报告已确认的客观事实与未覆盖维度；不得把未完成的 Codex 审查伪装为完整审查结果
 
 **交叉验证 + 去重合并**
 
