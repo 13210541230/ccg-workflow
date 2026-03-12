@@ -2,36 +2,50 @@
 
 存放路径：`.claude/plan/<task-name>/`
 
+## 目录结构
+
+- `task_plan.md`
+- `decisions.md`
+- `progress.md`
+- `findings.md`
+- `inputs/`
+- `artifacts/`
+- `codex-sessions/`
+
+`codex-sessions/` 用于保存 `ccg-codex` MCP 的角色化会话状态与持久化输出。复杂任务中，Codex 持续对话统一通过该目录下的会话注册表复用。
+
 ## 四个状态文件
 
 | 文件 | 用途 | 更新频率 |
 |------|------|----------|
-| `task_plan.md` | 任务拆解 + 依赖关系 + 子任务描述 | 动态：规划后补充实施步骤，执行偏差时追加偏差记录 |
-| `decisions.md` | 讨论阶段确认的关键决策集（复杂任务） | Phase 0.5 写入，后续只读 |
-| `progress.md` | 各阶段状态 + 时间线 + 阶段产出摘要 | 动态，每阶段更新 |
-| `findings.md` | 子Agent产出的发现/问题/审查结果 | 累积追加 |
-| `inputs/` 目录 | 子Agent prompt 的动态输入内容（task.md / context.md / decisions.md 等） | 按阶段写入，可跨阶段复用 |
-| `prompts/` 目录 | assemble-prompt.sh 组装后的完整 prompt 文件 | 每次 spawn 前覆写 |
+| `task_plan.md` | 任务拆解、实施步骤、关键文件、回滚点 | 规划后写入，执行偏差时更新 |
+| `decisions.md` | 复杂任务的关键决策与约束 | Phase 0.8 写入，后续只读或补充 |
+| `progress.md` | 阶段状态、时间线、错误日志、会话状态 | 动态，每阶段更新 |
+| `findings.md` | 分析、规划、实施、审查、测试的关键发现 | 动态追加 |
 
 ## progress.md 模板
 
 ```markdown
 # Progress: <任务名>
 
-## 状态: <initializing|discussing|decisions_confirmed|analyzing|planning|confirmed|executing|reviewing|testing|complete>
+## 状态: <initializing|discussing|analyzing|planning|confirmed|executing|testing|reviewing|complete|blocked>
 
 ## 复杂度: <简单|复杂>
 <评估依据>
 
 ## 时间线
-- [HH:MM] 初始化完成（复杂度：简单/复杂）
-- [HH:MM] 讨论阶段完成（N 个决策已确认）← 仅复杂任务
+- [HH:MM] 初始化完成
+- [HH:MM] 讨论阶段完成
 - [HH:MM] 分析阶段完成
 - [HH:MM] 规划阶段完成
 - [HH:MM] 用户确认计划
 - [HH:MM] 实施阶段完成
-- [HH:MM] 审查阶段完成
 - [HH:MM] 测试阶段完成
+- [HH:MM] 审查阶段完成
+
+## 迭代状态
+- ITERATION: <0|1|2|3>
+- 收敛状态: <running|passed|blocked|stopped>
 
 ## 阶段产出
 
@@ -44,32 +58,38 @@
 ### 实施
 <摘要>
 
-### 审查
+### 测试
 <摘要>
 
-### 测试
+### 审查
 <摘要>
 
 ## 错误日志
 
-| 时间 | 阶段 | Worker | 错误描述 | 尝试次数 | 解决方式 |
-|------|------|--------|----------|----------|----------|
+| 时间 | 阶段 | 角色/会话 | 错误描述 | 尝试次数 | 解决方式 |
+|------|------|-----------|----------|----------|----------|
 
 ## 会话日志
 
-| 时间 | 阶段 | Worker | 关键动作 | 结果 |
-|------|------|--------|----------|------|
+| 时间 | 阶段 | 角色/会话 | 关键动作 | 结果 |
+|------|------|-----------|----------|------|
 
-## Worker Registry
+## Session Registry
 
-| 阶段 | Worker | Agent ID | Subagent Type | 状态 | Output File | CODEX_SESSION | 可复用 | 备注 |
-|------|--------|----------|---------------|------|-------------|---------------|--------|------|
-| Phase 3 | execute-worker | <agent_id> | <ccg:codex-collaborator / agent-teams:team-implementer / general-purpose> | <running/completed/failed> | <path> | <session_id> | <yes/no> | <空输出/路由变更/可用于 resume> |
+| 角色 | Session Name | Session ID | Backend | Sandbox | 状态 | 可复用 | Last Output | 备注 |
+|------|--------------|------------|---------|---------|------|--------|-------------|------|
+| analyzer-a | <task-analyzer-a> | <session_id> | codex | read-only | <ready/active/failed/closed> | <yes/no> | <path> | <可重建/禁止复用原因> |
+| analyzer-b | ... | ... | codex | read-only | ... | ... | ... | ... |
+| planner-a | ... | ... | codex | read-only | ... | ... | ... | ... |
+| planner-b | ... | ... | codex | read-only | ... | ... | ... | ... |
+| executor | ... | ... | codex | workspace-write | ... | ... | ... | ... |
+| reviewer-a | ... | ... | codex | read-only | ... | ... | ... | ... |
+| reviewer-b | ... | ... | codex | read-only | ... | ... | ... | ... |
 
 ## 消息日志
 
-| 时间 | 阶段 | 方向 | 消息类型 | 摘要 | 决策结果 |
-|------|------|------|----------|------|----------|
+| 时间 | 阶段 | 方向 | 类型 | 摘要 | 结果 |
+|------|------|------|------|------|------|
 ```
 
 ## findings.md 模板
@@ -78,19 +98,22 @@
 # Findings: <任务名>
 
 ## 分析发现
-- [来源: analyze-worker] <发现内容>
+- [来源: analyzer-a] <发现内容>
+- [来源: analyzer-b] <发现内容>
 
 ## 规划产出
-- [来源: plan-worker] <产出内容>
+- [来源: planner-a] <计划要点>
+- [来源: planner-b] <计划要点>
 
 ## 实施产出
-- [来源: execute-worker] <变更文件列表 + diff 摘要>
-
-## 审查结果
-- [来源: review-worker] <按 Critical/Major/Minor/Suggestion 分级>
+- [来源: executor] <变更摘要>
 
 ## 测试结果
-- [来源: test-worker] <测试结果>
+- [来源: local test run] <结果>
+
+## 审查结果
+- [来源: reviewer-a] <按严重级别分组>
+- [来源: reviewer-b] <按严重级别分组>
 ```
 
 ## decisions.md 模板
@@ -102,9 +125,9 @@
 - 子任务数：N
 - 涉及文件数：N
 - 架构变更：是/否
-- 备选方案数：N
+- 方案权衡：N
 - 风险等级：低/中/高
-- **结论**：复杂 → 进入讨论阶段
+- **结论**：简单/复杂
 
 ## 已确认决策
 
@@ -114,26 +137,42 @@
 - **用户选择**: <选项>
 - **原因**: <理由>
 
-## 决策摘要（供后续阶段引用）
-<将所有已确认决策整理为一段简洁的约束描述>
+## 决策摘要
+<供后续阶段引用的简洁约束描述>
 ```
 
 ## inputs/ 文件清单
 
-| 文件 | 对应占位符 | 写入时机 |
-|------|-----------|----------|
-| `task.md` | `{{TASK_CONTENT}}` | Phase 0（增强后需求），测试失败/审查 Critical 时追加 |
-| `context.md` | `{{PROJECT_CONTEXT}}` | Phase 0，通常不变 |
-| `decisions.md` | `{{DECISIONS_CONTENT}}` | Phase 0.5 讨论结束后 |
-| `findings.md` | `{{ANALYZE_FINDINGS}}` | Phase 1 完成后 |
-| `plan.md` | `{{PLAN_CONTENT}}` | Phase 2 用户确认后 |
-| `diff.txt` | `{{DIFF_CONTENT}}` | Phase 4 前（git diff 输出） |
-| `changed-files.txt` | `{{CHANGED_FILES}}` | Phase 5 前 |
-| `team-name.txt` | `{{TEAM_NAME}}` | Phase 3/4 Teammate 模式时 |
+| 文件 | 用途 | 写入时机 |
+|------|------|----------|
+| `task.md` | 增强后的任务描述、后续追加修复要求 | Phase 0，测试/审查回流时追加 |
+| `context.md` | 项目上下文摘要 | Phase 0 |
+| `decisions.md` | 锁定约束 | Phase 0.8 |
+| `findings.md` | 分析结论 | Phase 1 后 |
+| `plan.md` | 最终计划 | Phase 2 后 |
+
+## artifacts/ 建议文件
+
+- `analysis-request.md`
+- `analysis-a.md`
+- `analysis-b.md`
+- `plan-request.md`
+- `plan-a.md`
+- `plan-b.md`
+- `implementation-request.md`
+- `implementation-result-<n>.md`
+- `test-result-<n>.md`
+- `test-failure-<n>.md`
+- `diff-<n>.txt`
+- `review-request-<n>.md`
+- `review-a-<n>.md`
+- `review-b-<n>.md`
+- `review-failure-<n>.md`
 
 ## 复用规则
 
-- Phase 3 首次 spawn 成功后，必须立即在 `progress.md` 的 Worker Registry 记录 `Agent ID / Subagent Type / 状态 / CODEX_SESSION / 可复用`
-- 审查 Critical 或测试失败回流到 Phase 3 时，默认先检查 Worker Registry 中最近一条 Phase 3 记录
-- 只有当该记录状态为 `completed` 且 `可复用=yes` 且本轮实施路由未变化时，才允许 `resume`
-- 若记录为 `failed`、`可复用=no`、空输出、输出文件缺失、路由变化，必须新开 Agent
+- 复杂任务开始后，先在 `Session Registry` 中登记各角色 `Session Name / Backend / Sandbox`
+- 首次 `codex_session_send` 成功后，立即回填 `Session ID / 状态 / Last Output`
+- 测试失败或审查回流到 Phase 3 时，默认先检查 `executor`
+- 只有当 `executor` 状态可复用且未标记失败时，才继续向同一 session 发送修复请求
+- 若某角色出现空输出、角色混用、输出损坏，应将其标记为 `可复用=no`

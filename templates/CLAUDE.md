@@ -2,11 +2,26 @@
 
 # Templates (命令模板 + 专家提示词 + 输出风格)
 
-**Last Updated**: 2026-03-12 (manage routing hardening)
+**Last Updated**: 2026-03-12 (teammate command draft)
 
 ---
 
 ## 变更记录 (Changelog)
+
+### 2026-03-12 (teammate command draft)
+- 新增 `teammate.md` 命令模板，定义 Claude Lead / 多个角色化 Codex Partner 的完整协作工作流
+- 新增 `shared/teammate-bus-format.md`，规范多 Partner 的 `messages.jsonl` / `registry.json` / `artifacts/`
+- 安装器与 README 接入 `/ccg:teammate`，明确支持 `planner / executor / reviewer` 多会话复用，作为未来替代 `manage` 的实验命令
+
+### 2026-03-12 (generic codex mcp)
+- 新增 `plugin/scripts/ccg_codex_mcp.py`，提供通用 `ccg-codex` MCP server
+- `templates/plugin/.mcp.json` 接入内置 MCP，支持 `codex_once` 与持久化 `codex_session_*` 工具
+- `teammate.md` 改为优先通过 MCP 维持连续对话，而不是在模板里手工管理 `SESSION_ID`
+
+### 2026-03-12 (manage mcp refactor)
+- `manage.md` 重写为：简单任务 Claude 直做，复杂任务通过 `ccg-codex` MCP 驱动多角色 Codex 会话
+- `manage-state-format.md` 新增 `codex-sessions/` 与 `Session Registry`，统一记录 `Session Name / Session ID / 可复用状态`
+- `manage` 不再把 Codex 连续对话建立在 agent resume 文本协议上，而是建立在持久化 MCP session 工具上
 
 ### 2026-03-12 (manage routing hardening)
 - `manage.md` 强化为：复杂任务先尝试 `TeamCreate`，Phase 3 复杂代码修改优先 `ccg:codex-collaborator`
@@ -46,7 +61,7 @@
 
 ```
 templates/
-+-- commands/              # 28 个斜杠命令模板 -> ~/.claude/commands/ccg/
++-- commands/              # 29 个斜杠命令模板 -> ~/.claude/commands/ccg/
 |   +-- agents/            # 6 个子智能体 -> ~/.claude/agents/ccg/
 |   |   +-- planner.md
 |   |   +-- ui-ux-designer.md
@@ -81,6 +96,7 @@ templates/
 |   +-- team-plan.md        # Agent Teams 规划
 |   +-- team-exec.md        # Agent Teams 并行实施
 |   +-- team-review.md      # Agent Teams 审查
+|   +-- teammate.md         # Claude/Codex 多角色多会话协作
 +-- prompts/               # 19 个专家提示词 -> ~/.claude/.ccg/prompts/
 |   +-- codex/             # 6 个 Codex 角色
 |   |   +-- analyzer.md / architect.md / debugger.md / optimizer.md / reviewer.md / tester.md
@@ -121,8 +137,8 @@ templates/
 
 ## 命令分类
 
-### 开发工作流（12 个）
-workflow / plan / execute / frontend / backend / feat / analyze / debug / optimize / test / review / manage
+### 开发工作流（13 个）
+workflow / plan / execute / frontend / backend / feat / analyze / debug / optimize / test / review / manage / teammate
 
 ### 运行时直连工具（1 个）
 codex

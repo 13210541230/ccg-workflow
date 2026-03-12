@@ -1,6 +1,6 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-12 (v1.7.82)
+**Last Updated**: 2026-03-12 (v1.8.0)
 
 ---
 
@@ -12,6 +12,11 @@
 - `/ccg:manage` 复杂任务默认先尝试 `TeamCreate`，复杂代码修改优先 `ccg:codex-collaborator`，避免错误落到 `general-purpose`
 - `analyze-worker`、`plan-worker`、`review-worker`、`execute-worker` 补充 Codex 超时/空输出处理规则，禁止静默降级为 Agent 自行补做
 - `manage-state-format.md` 新增 Phase 3 Worker Registry；测试失败或审查回流时优先 resume 原实施 worker，避免重复分析上下文
+
+### 2026-03-12 (v1.8.0 - manage mcp runtime)
+- 新增内置 `ccg-codex` MCP server，提供 `codex_once` 与持久化 `codex_session_*` 工具，普通任务也可直接调用通用 Codex 能力
+- `/ccg:manage` 重写为简单任务 Claude 直做、复杂任务通过 `ccg-codex` MCP 驱动多角色 Codex 会话
+- `manage-state-format.md` 新增 `codex-sessions/` 与 `Session Registry`，统一记录会话复用状态
 
 ### 2026-03-11 (v1.7.81 - manage agent-teams default + Codex escalation rules)
 - `/ccg:manage` 在 Phase 3/4 默认优先尝试 Agent Teams，仅在 TeamCreate 不可用或失败时降级
@@ -125,7 +130,7 @@
 
 ## 项目愿景
 
-**CCG (Claude + Codex)** 是一个多模型协作开发系统，以 Claude Code 为编排中心，通过 Codex 双视角（逻辑 + 架构）实现多模型协作的最佳开发体验。运行时默认走 Codex，同时保留 Gemini 作为可切换后端链路。以 Claude Code Plugin 形式分发，用户通过 `/install-plugin` 一键安装 28 个斜杠命令 + 19 个专家提示词，即可使用 `/ccg:xxx` 命令。
+**CCG (Claude + Codex)** 是一个多模型协作开发系统，以 Claude Code 为编排中心，通过 Codex 双视角（逻辑 + 架构）实现多模型协作的最佳开发体验。运行时默认走 Codex，同时保留 Gemini 作为可切换后端链路。以 Claude Code Plugin 形式分发，用户通过 `/install-plugin` 一键安装 29 个斜杠命令 + 19 个专家提示词，即可使用 `/ccg:xxx` 命令。
 
 ---
 
@@ -136,7 +141,7 @@ graph TD
     User["用户"] --> Plugin["/install-plugin"]
     Plugin --> Init["一键安装"]
 
-    Init --> Commands["commands/<br/>28 个命令"]
+    Init --> Commands["commands/<br/>29 个命令"]
     Init --> Agents["agents/<br/>6 个子智能体"]
     Init --> Prompts["prompts/<br/>19 个专家提示词"]
     Init --> Runtime["scripts + skills<br/>wrapper-free runtime"]
@@ -163,7 +168,7 @@ graph TD
 
 ```mermaid
 graph TD
-    A["(根) ccg-workflow<br/>v1.7.80"] --> B["src/<br/>TypeScript CLI"]
+    A["(根) ccg-workflow<br/>v1.8.0"] --> B["src/<br/>TypeScript CLI"]
     A --> C["templates/skills/<br/>运行时 Skill"]
     A --> D["templates/<br/>命令 + 提示词"]
     A --> E["templates/plugin/scripts/<br/>运行时脚本"]
@@ -173,7 +178,7 @@ graph TD
     B --> B3["i18n/<br/>国际化"]
     B --> B4["types/<br/>类型定义"]
 
-    D --> D1["commands/<br/>28 模板 + 6 agents"]
+    D --> D1["commands/<br/>29 模板 + 6 agents"]
     D --> D2["prompts/<br/>19 专家提示词"]
     D --> D3["output-styles/<br/>5 输出风格"]
     D --> D4["skills/<br/>Skill + script"]
@@ -240,7 +245,7 @@ python ~/.claude/.ccg/scripts/codex_bridge.py --help
 
 ## 对外接口
 
-### Slash Commands 接口（28 个命令）
+### Slash Commands 接口（29 个命令）
 
 **开发工作流（12 个）**:
 
@@ -317,7 +322,7 @@ v1.7.0 起，以下配置不再支持自定义：
 | 前端模型 | Codex | 双 Codex 架构 |
 | 后端模型 | Codex（默认），可通过 `CCG_BACKEND=gemini` 或 `CCG_BACKEND=claude` 切换 | 默认保持 Codex，Gemini 链路保留 |
 | 协作模式 | smart | 最佳实践 |
-| 命令数量 | 28 个 | 全部安装 |
+| 命令数量 | 29 个 | 全部安装 |
 
 ---
 
@@ -395,7 +400,7 @@ src/
 
 ```
 templates/
-+-- commands/                  # 28 个斜杠命令
++-- commands/                  # 29 个斜杠命令
 +-- commands/agents/           # 6 个子智能体
 +-- prompts/codex/             # 6 个 Codex 提示词
 +-- prompts/gemini/            # 7 个 Gemini 提示词

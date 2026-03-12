@@ -1,3 +1,16 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "ccg-codex": {
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "scripts/ccg_codex_mcp.py"
+      ],
+      "env": {
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "startup_timeout_ms": 30000
+    }
+  }
 }

@@ -23,7 +23,7 @@ function findPackageRoot(startDir: string): string {
 
 const PACKAGE_ROOT = findPackageRoot(__dirname)
 
-// All available commands (27 total)
+// All available commands (29 total)
 const ALL_COMMANDS = [
   'workflow', // 完整6阶段开发工作流
   'plan', // 多模型协作规划（Phase 1-2）
@@ -52,6 +52,7 @@ const ALL_COMMANDS = [
   'team-exec', // Agent Teams 并行实施（spawn Builders 并行写代码）
   'team-review', // Agent Teams 审查（双模型交叉审查并行产出）
   'manage', // 主Agent调度模式（自动化编排 + 状态管理 + 多维审查）
+  'teammate', // Claude/Codex 多角色 teammate 协作（消息总线 + 多 session 复用）
 ] as const
 
 // Workflow configurations (for compatibility with existing code)
@@ -353,6 +354,17 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     description: '主Agent调度模式：自动化任务编排 + 状态管理 + 多维审查',
     descriptionEn: 'Main agent orchestration with automated task dispatch and state management',
   },
+  {
+    id: 'teammate',
+    name: 'Teammate 协作',
+    nameEn: 'Teammate Collaboration',
+    category: 'development',
+    commands: ['teammate'],
+    defaultSelected: true,
+    order: 0.6,
+    description: 'Claude Lead 与多个角色化 Codex Partner 的消息总线式协作，强调多 session 复用与结构化对话',
+    descriptionEn: 'Message-bus collaboration between Claude Lead and multiple role-specific Codex partners with session reuse',
+  },
 ]
 
 export function getWorkflowConfigs(): WorkflowConfig[] {
@@ -379,8 +391,8 @@ export const WORKFLOW_PRESETS = {
   full: {
     name: '完整',
     nameEn: 'Full',
-    description: '全部命令（27个）',
-    descriptionEn: 'All commands (27)',
+    description: '全部命令（29个）',
+    descriptionEn: 'All commands (29)',
     workflows: WORKFLOW_CONFIGS.map(w => w.id),
   },
 }

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.0] - 2026-03-12
+
+### ✨ 新功能
+
+- **内置 `ccg-codex` MCP server**：新增通用 `codex_once`、`codex_session_ensure`、`codex_session_send`、`codex_session_status`、`codex_session_list`、`codex_session_close` 工具，普通任务不走 `/ccg:*` 指令时也能直接复用 Codex 会话
+
+### ♻️ 重构
+
+- **`/ccg:manage` 工作流收口到 MCP 会话层**：简单任务改为 Claude 直做；复杂任务改为通过 `ccg-codex` MCP 驱动 `analyzer / planner / executor / reviewer` 多角色 Codex 会话，不再依赖手工 `SESSION_ID` / `resume` 协议
+- **状态格式升级**：`manage-state-format.md` 新增 `codex-sessions/` 和 `Session Registry`，统一记录 `Session Name / Session ID / Sandbox / 可复用状态`
+
 ## [1.7.82] - 2026-03-12
 
 ### 🐛 修复

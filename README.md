@@ -44,6 +44,7 @@
 | `/ccg:test` | 测试生成 |
 | `/ccg:review` | 代码审查 |
 | `/ccg:manage` | 主Agent调度 |
+| `/ccg:teammate` | Claude/Codex 多角色多会话协作 |
 | `/ccg:commit` | Git 提交 |
 | `/ccg:rollback` | Git 回滚 |
 | `/ccg:clean-branches` | 清理分支 |
@@ -136,6 +137,19 @@
 
 优先使用内置 `codex-runtime` Skill 或 `codex_bridge.py` 的持久化输出文件，而不是依赖临时 TaskOutput 文件。该 Skill 当前已支持 `codex` / `gemini` / `claude`，但默认仍走 `codex`。
 
+## 内置 MCP
+
+插件现在内置 `ccg-codex` MCP server，适合不走 `/ccg:*` 指令时直接调用通用 Codex 能力：
+
+- `codex_once`：一次性调用 Codex / Gemini / Claude
+- `codex_session_ensure`：预创建可复用会话槽位
+- `codex_session_send`：自动复用已有 `SESSION_ID` 持续对话
+- `codex_session_status` / `codex_session_list` / `codex_session_close`
+
+建议：
+- 普通任务直接用 `codex_once` 或 `codex_session_send`
+- 复杂协作任务让 `/ccg:teammate` 或未来替代 `manage` 的指令基于这些工具编排
+
 ## 架构
 
 ```
@@ -168,4 +182,4 @@ MIT
 
 ---
 
-v1.7.81 | [Issues](https://github.com/fengshao1227/ccg-workflow/issues)
+v1.8.0 | [Issues](https://github.com/fengshao1227/ccg-workflow/issues)
