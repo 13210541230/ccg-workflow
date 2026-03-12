@@ -1,12 +1,16 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-12 (v1.8.1)
+**Last Updated**: 2026-03-12 (v1.8.2)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-12 (v1.8.2 - release pipeline fix for plugin runtime files)
+- 修复发版脚本漏同步插件根目录运行时文件的问题，`start.mjs` 与 `server.bundle.mjs` 现在会随 `.mcp.json` 一起发布到 `ccg-plugin`
+- 修复 `1.8.1` 发布回归：用户更新发布版后，`ccg-codex` MCP 不再因缺少 Node 运行时入口文件而连接失败
 
 ### 2026-03-12 (v1.8.1 - ccg-codex MCP runtime hardening)
 - `ccg-codex` 插件入口从直接执行 Python 脚本改为 `node start.mjs`，修复插件环境下相对路径和连接握手不稳定问题

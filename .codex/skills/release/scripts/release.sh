@@ -109,7 +109,13 @@ if [[ "$SKIP_PLUGIN" == "false" ]]; then
             cp -r "dist/plugin/$dir" "$PLUGIN_REPO/$dir"
         fi
     done
-    cp dist/plugin/.mcp.json "$PLUGIN_REPO/.mcp.json"
+
+    # 同步插件根目录运行时文件
+    for file in .mcp.json start.mjs server.bundle.mjs; do
+        if [[ -f "dist/plugin/$file" ]]; then
+            cp "dist/plugin/$file" "$PLUGIN_REPO/$file"
+        fi
+    done
 
     echo "  ✓ 已同步到 $PLUGIN_REPO"
 

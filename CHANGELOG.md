@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.2] - 2026-03-12
+
+### 🐛 修复
+
+- **修复插件发布产物缺文件**：发版脚本现在会同步插件根目录运行时文件 `start.mjs` 和 `server.bundle.mjs`，避免 `.mcp.json` 已切到 Node 入口但发布仓库缺少对应文件
+- **修复 `1.8.1` 发布回归**：用户通过 `/plugin update` 更新到发布版后，`ccg-codex` MCP 不再因缺失根目录 runtime 文件而连接失败
+
 ## [1.8.1] - 2026-03-12
 
 ### 🐛 修复
