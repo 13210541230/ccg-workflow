@@ -1,12 +1,15 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-13 (v1.11.1)
+**Last Updated**: 2026-03-13 (v1.12.1)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-13 (v1.12.1 - version alignment)
+- 版本号对齐，触发插件端 `/plugin update` 更新分发
 
 ### 2026-03-13 (v1.11.1 - manage hotfix)
 - 回退 v1.12.0 manage.md 外置协议重构：Bootstrap 要求读取尚不存在的本地文件，导致新会话中 `/ccg:manage` 五阶段流程完全失效

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.12.1] - 2026-03-13
+
+### 🔧 维护
+
+- 版本号对齐，触发插件端 `/plugin update` 更新分发
+
+---
+
 ## [1.11.1] - 2026-03-13
 
 ### 🐛 修复
