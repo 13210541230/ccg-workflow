@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.11.1] - 2026-03-13
+
+### 🐛 修复
+
+- **回退 v1.12.0 manage.md 重构**：v1.12.0 将核心协议外置到共享文件导致 `/ccg:manage` 指令在新会话中无法生效（Bootstrap 要求读取尚未创建的本地文件），回退至 v1.11.0 的内联核心协议结构
+
+---
+
 ## [1.11.0] - 2026-03-12
 
 ### ✨ 新功能

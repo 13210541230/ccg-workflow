@@ -1,12 +1,16 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-12 (v1.11.0)
+**Last Updated**: 2026-03-13 (v1.11.1)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-13 (v1.11.1 - manage hotfix)
+- 回退 v1.12.0 manage.md 外置协议重构：Bootstrap 要求读取尚不存在的本地文件，导致新会话中 `/ccg:manage` 五阶段流程完全失效
+- 恢复 v1.11.0 内联核心协议（12 条）、角色定义、Simple/Codex Worker 表格
 
 ### 2026-03-12 (v1.11.0 - plugin absorption + workflow enhancement)
 - 新增 3 个 CCG 内置审查 Agent：`architect-reviewer` / `code-quality-reviewer` / `security-reviewer`，消除 `comprehensive-review` 外部插件依赖
