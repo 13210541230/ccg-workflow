@@ -148,20 +148,54 @@ Agent({ resume: "<EXECUTOR_AGENT_ID>",
 
 #### Phase 5：测试
 
-5 步门控（全部通过才能声称完成）：
-1. 运行完整测试套件
-2. 确认原始问题已解决
-3. 确认无回归
-4. 记录证据（实际命令输出）到 progress.md
-5. 更新 progress.md
+**铁律：Lead 禁止在主 Agent 中直接运行测试命令。** 所有测试执行必须通过 test-worker subagent 完成。
+
+##### 5.1 写入 test-request artifact
+
+写入 `artifacts/test-request-<n>.md`，包含：
+- 需要运行的测试命令（完整命令）
+- 预期行为与验收标准
+- 本轮迭代编号 N
+
+##### 5.2 派发 test-worker
+
+优先 `resume` 原 test-worker：
+
+```
+Agent({ resume: "<TEST_WORKER_AGENT_ID>",
+  prompt: "Continue test-worker thread.\nPlan dir: <PLAN_DIR>\nWorkdir: <WORKDIR>\nRound: <N>\nOutput file: <PLAN_DIR>/artifacts/test-result-<N>.md\nArtifacts:\n- <PLAN_DIR>/artifacts/test-request-<N>.md\nMission: Re-run the test suite as specified. Record COMPLETE verbatim command output. Update the structured report.",
+  description: "Resume test worker" })
+```
+
+首次或 resume 不可用时新建：
+
+```
+Agent({ subagent_type: "general-purpose",
+  prompt: "Role: test-worker\nPlan dir: <PLAN_DIR>\nWorkdir: <WORKDIR>\nRound: <N>\nOutput file: <PLAN_DIR>/artifacts/test-result-<N>.md\nArtifacts:\n- <PLAN_DIR>/artifacts/test-request-<N>.md\n- <PLAN_DIR>/task_plan.md\nMission: Run the test suite exactly as specified in test-request-<N>.md. Do NOT summarize or truncate output. Write a structured markdown report to the output file with ALL of the following fields:\n  test_status: pass|fail\n  commands_run: [list of exact commands]\n  original_issue_resolved: yes|no|unknown\n  regression_detected: yes|no\n  failure_details: <verbatim error if any>\nThen append a section '## Full Output' with the complete verbatim terminal output.",
+  description: "Test worker agent" })
+```
+
+记录 `Agent ID` 到 `progress.md` 的 Test Worker Registry。
+
+##### 5.3 Lead 读取 artifact 并裁决
+
+```
+Read({ file_path: "<PLAN_DIR>/artifacts/test-result-<N>.md" })
+```
+
+校验 artifact 必须包含全部必需字段：`test_status / commands_run / original_issue_resolved / regression_detected`。缺少任一字段 → 视为无效 artifact，重试 test-worker。
+
+根据 `test_status` 裁决：
+- `pass` 且 `regression_detected=no` → 进入 Phase 4（审查）
+- `fail` 或 `regression_detected=yes` → 写入 `artifacts/test-failure-<N>.md`（摘录关键失败信息）→ 回 Phase 3
 
 | 声称 | 必需证据 | 不充分 |
 |------|----------|--------|
-| 测试通过 | 完整命令输出 | "测试应该通过" |
-| 功能正常 | 实际运行日志 | 代码看起来正确 |
-| 无回归 | 全套测试通过输出 | 部分测试通过 |
+| 测试通过 | test-result artifact 中 `test_status=pass` + Full Output | Lead 凭记忆声称通过 |
+| 功能正常 | test-result 中 `original_issue_resolved=yes` + 实际运行日志 | 代码看起来正确 |
+| 无回归 | test-result 中 `regression_detected=no` + 全套测试输出 | 部分测试通过 |
 
-失败 → 回 Phase 3，最多 3 轮。
+更新 `progress.md`（测试轮次 + 裁决结果 + artifact 路径）。失败 → 回 Phase 3，最多 3 轮。
 
 ---
 

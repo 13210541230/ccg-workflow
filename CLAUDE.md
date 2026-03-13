@@ -1,12 +1,19 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-13 (v1.12.2)
+**Last Updated**: 2026-03-13 (v1.12.3)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-13 (v1.12.3 - manage test worker dispatch)
+- `manage` Phase 5 测试执行改为派发独立 `test-worker` subagent，主 Agent 禁止直接运行测试命令
+- 新增 `Test Worker` 角色表与 `Test Worker Registry`，Phase 0.6.1 / 0.7 预登记 `test-worker` 槽位
+- `manage-phases.md` Phase 5 重写为：写 test-request → dispatch test-worker → Lead 读 artifact 裁决
+- test-worker artifact 字段校验（`test_status / commands_run / original_issue_resolved / regression_detected`），缺字段视为 `invalid_test_artifact`
+- 关键规则新增第 12 条：测试必须通过 `test-worker` 执行，不接受口头汇报
 
 ### 2026-03-13 (v1.12.2 - manage context resilience)
 - `manage` 上下文韧性增强：新增 `manage-context-anchor.sh` 挂载到 `Write|Edit` PreToolUse，压缩后自动重注入协议

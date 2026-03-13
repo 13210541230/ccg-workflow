@@ -76,6 +76,7 @@
 - `session damaged`
 - `team create failed`
 - `role injection missing`
+- `invalid_test_artifact`（test-worker 返回缺少必需字段）
 
 ## 会话日志
 
@@ -87,6 +88,12 @@
 | 槽位 | Agent Type | Agent ID | 状态 | 可复用 | Last Output | 备注 |
 |------|------------|----------|------|--------|-------------|------|
 | simple-executor | `general-purpose` | <agent_id> | <ready/active/failed/completed> | <yes/no> | <path> | <升级为复杂/重建原因> |
+
+## Test Worker Registry
+
+| 槽位 | Agent Type | Agent ID | 状态 | 可复用 | Last Output | 备注 |
+|------|------------|----------|------|--------|-------------|------|
+| test-worker | `general-purpose` | <agent_id> | <ready/active/failed/completed> | <yes/no> | artifacts/test-result-<n>.md | <重建原因/artifact 无效原因> |
 
 ## Team Registry（仅 Team 模式使用）
 
@@ -141,7 +148,7 @@
 - [来源: executor] <变更摘要>
 
 ## 测试结果
-- [来源: local test run] <结果>
+- [来源: test-worker, artifact: artifacts/test-result-<n>.md] test_status=<pass|fail>, regression_detected=<yes|no>
 
 ## 审查结果
 - [来源: reviewer-a] <按严重级别分组>
@@ -185,6 +192,7 @@
 
 ## artifacts/ 建议文件
 
+- `test-request-<n>.md`
 - `analysis-request.md`
 - `analysis-a.md`
 - `analysis-b.md`
@@ -209,7 +217,10 @@
 - 默认将 `Runtime Mode` 记录为 `subagent`
 - 只有显式 Team 模式才创建 `Team Name / Team Lead Name`，并回填 `Team Name / Teammate Name`
 - 简单任务开始后，必须先在 `Simple Worker Registry` 中登记 `simple-executor`
+- 任务开始后（简单或复杂），必须先在 `Test Worker Registry` 中登记 `test-worker`
 - simple worker 首次成功 spawn 后，立即回填 `Agent ID / 状态 / 可复用 / Last Output`
+- test-worker 首次成功 spawn 后，立即回填 `Agent ID / 状态 / 可复用 / Last Output`
+- Lead 接受 test-worker 产出前，必须读取 `test-result-<n>.md` 并验证 `test_status / commands_run / original_issue_resolved / regression_detected` 字段均存在；缺任一字段则视为无效 artifact，重试 test-worker
 - codex worker 首次成功 spawn 后，立即回填 `Agent ID / 状态 / 可复用`
 - Lead 接受 codex worker 产出前，必须验证 `runtime_mode / session_id / reuse_eligible / output_file`；验证通过后再把 `Codex Proof` 标记为 `verified`
 - 若 codex worker 摘要缺少上述任一字段，则将 `Codex Proof` 标记为 `missing`，并在错误日志中记录 `codex bypass`

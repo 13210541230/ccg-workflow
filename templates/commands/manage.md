@@ -21,6 +21,7 @@ $ARGUMENTS
 - **验证先于完成**：Lead 只有在 worker 返回了有效的 Codex 证据后，才允许接受其阶段产出
 - **禁止静默降级**：复杂任务一旦进入 codex worker 路径，失败时只能重试、重建同角色 worker、或升级给用户，不能偷偷改成 Claude 自己补完整复杂分析/规划/审查/实施
 - **执行优先复用**：测试失败或审查回流到实施阶段时，优先 `resume` 原 `codex-executor` worker
+- **测试必须派发 worker**：Lead 禁止在主 Agent 中直接运行测试命令；Phase 5 必须派发 `test-worker` subagent，由 worker 将完整输出写入 artifact，Lead 只读取 artifact 裁决
 - **复杂路径必须有运行时证据**：默认 subagent 路径必须记录 `Runtime Mode=subagent`；若走 Team 模式，则还必须记录 `Team Name`、`Team Lead Name`、`Teammate Name`
 
 ---
@@ -33,7 +34,7 @@ $ARGUMENTS
 - 判断简单/复杂并选择执行路径
 - 简单任务中派发、复用、监督单 worker agent
 - 复杂任务中派发、复用、监督 `codex-*` worker（默认 subagent，必要时可为 team-agent）
-- 汇总 worker 产出，运行测试，做最终决策
+- 汇总 worker 产出，读取 test-result artifact，做最终决策
 - 持续更新状态文件与注册表
 
 无论简单还是复杂，你都是编排者与审查者，不是直接源码修改者。
@@ -52,6 +53,21 @@ $ARGUMENTS
 - Lead 创建状态文件与输入文件
 - `simple-executor` 负责真正的源码修改
 - Lead 只做验证、审查裁决和是否升级为复杂任务的决定
+
+---
+
+## Test Worker
+
+测试执行（Phase 5）**必须**派发给独立的 test-worker，不得在主 Agent 中直接运行测试命令：
+
+| 槽位 | Agent Type | 职责 |
+|------|------------|------|
+| `test-worker` | `general-purpose` | 运行完整测试套件、记录完整命令输出（verbatim）、写入结构化 test-result artifact |
+
+test-worker 不需要 Codex 证据校验，但必须满足：
+- 将完整（未截断）命令输出写入 `artifacts/test-result-<n>.md`
+- artifact 必须包含结构化字段：`test_status / commands_run / original_issue_resolved / regression_detected / failure_details`
+- Lead 仅读取 artifact 内容做裁决，不接受口头汇报替代 artifact
 
 ---
 
@@ -199,9 +215,9 @@ Read({ file_path: "<PLUGIN_ROOT>/shared/manage-state-format.md" })
 - Hard Stop: 无
 
 ## Phase 5 (测试)
-- 允许动作: 运行实际测试命令, 记录证据到 progress.md
-- 禁止动作: 声称测试通过而不执行实际命令, 只跑部分测试
-- Worker返回后必更新: progress.md
+- 允许动作: 写入 test-request artifact, 派发/resume test-worker (subagent), 读取 artifacts/test-result-<n>.md, 更新 progress.md
+- 禁止动作: 主 Agent 直接运行测试命令, 凭内存或 worker 口头汇报声称测试通过, 跳过 test-result artifact 直接裁决
+- Worker返回后必更新: progress.md, Test Worker Registry
 - Hard Stop: 无
 ```
 
@@ -226,12 +242,11 @@ Read({ file_path: "<PLUGIN_ROOT>/shared/manage-state-format.md" })
 
 仅简单任务执行。预登记：
 - `simple-executor`
+- `test-worker`
 
-写入 `progress.md`：
-- `agent_type: general-purpose`
-- `agent_name: simple-executor`
-- `sandbox: workspace-write`
-- `status: ready`
+写入 `progress.md`（每条一行）：
+- `agent_type: general-purpose | agent_name: simple-executor | sandbox: workspace-write | status: ready`
+- `agent_type: general-purpose | agent_name: test-worker | sandbox: workspace-write | status: ready`
 
 #### 0.7 复杂任务初始化 Codex worker 槽位
 
@@ -243,6 +258,7 @@ Read({ file_path: "<PLUGIN_ROOT>/shared/manage-state-format.md" })
 - `executor`
 - `reviewer-a`
 - `reviewer-b`
+- `test-worker`（`agent_type: general-purpose`，`sandbox: workspace-write`，无 Codex session）
 
 此时先记录：
 - `runtime_mode: subagent`
@@ -307,7 +323,7 @@ Read({ file_path: "<PLUGIN_ROOT>/shared/manage-phases.md" })
 1. 将阶段产物写入 `artifacts/`
 2. 将关键发现追加到 `findings.md`（**每 2 次工具调用至少追加一次**）
 3. 更新 `progress.md`（状态字段 + 时间戳）
-4. 更新 `Simple Worker Registry`、`Codex Worker Registry`、`Codex Session Registry`，若启用 Team 模式再更新 `Team Registry`
+4. 更新 `Simple Worker Registry`、`Test Worker Registry`、`Codex Worker Registry`、`Codex Session Registry`，若启用 Team 模式再更新 `Team Registry`
 5. 记录 `Runtime Mode / Agent ID / Session Name / Session ID / reuse_eligible / Codex Proof`；若为 Team 模式，再额外记录 `Team Name / Team Lead Name / Teammate Name`
 6. 必要时向用户发送简短进度说明
 
@@ -404,6 +420,8 @@ Read({ file_path: "<PLUGIN_ROOT>/shared/manage-phases.md" })
 | worker 输出为空 | 标记该 worker 不可复用，同角色重建 |
 | Codex session 空输出 | 由 worker 标记 `reuse_eligible=no`，Lead 再决定是否重建 worker |
 | 测试失败 | 回到 Phase 3，优先 `resume` 原 executor worker |
+| test-worker 返回缺少 `test_status / commands_run / output` 字段 | 视为无效 artifact，重试 test-worker；连续 2 次失败则升级给用户 |
+| test-worker 连续 3 次失败 | 停止自动重试；用 `AskUserQuestion` 展示失败详情，选项：重试/跳过测试/阻塞完成 |
 | 审查有 Critical | 回到 Phase 3，优先 `resume` 原 executor worker |
 | 简单任务在执行中升级为复杂 | 立即停止 simple worker 的扩大实施，初始化 codex worker 槽位并切到复杂路径 |
 | 某角色 worker 连续 3 次失败 | 停止自动重试，升级给用户 |
@@ -423,3 +441,4 @@ Read({ file_path: "<PLUGIN_ROOT>/shared/manage-phases.md" })
 9. **按角色复用 Codex session**：由 worker 内部维护
 10. **简单执行优先复用 `simple-executor`；复杂执行优先复用 `executor` worker**
 11. **状态可追踪**：所有阶段与会话都要落盘到 `.claude/plan/<task-name>/`
+12. **测试必须通过 `test-worker` 执行**：Lead 禁止直接运行测试命令；测试结果必须以 artifact 文件为准，口头汇报无效

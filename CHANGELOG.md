@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.12.3] - 2026-03-13
+
+### ✨ 增强
+
+- `manage` Phase 5 测试执行改为派发独立 `test-worker` subagent，主 Agent 禁止直接运行测试命令
+- 新增 `Test Worker` 角色表与 `Test Worker Registry`（`manage.md` + `manage-state-format.md`）
+- Phase 0.6.1 / 0.7 预登记 `test-worker` 槽位；phase-gate Phase 5 更新为 worker 派发模式
+- `manage-phases.md` Phase 5 重写为三步流程：写 test-request artifact → dispatch test-worker → Lead 读 artifact 裁决
+- test-worker artifact 必须包含 `test_status / commands_run / original_issue_resolved / regression_detected` 字段，缺任一字段视为无效，重试 worker
+- 关键规则第 12 条：测试必须通过 `test-worker` 执行，口头汇报无效
+- 错误日志新增 `invalid_test_artifact` 标准值
+
+---
+
 ## [1.12.2] - 2026-03-13
 
 ### ✨ 增强
