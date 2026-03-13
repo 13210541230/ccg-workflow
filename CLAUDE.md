@@ -1,12 +1,19 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-13 (v1.12.1)
+**Last Updated**: 2026-03-13 (v1.12.2)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-03-13 (v1.12.2 - manage context resilience)
+- `manage` 上下文韧性增强：新增 `manage-context-anchor.sh` 挂载到 `Write|Edit` PreToolUse，压缩后自动重注入协议
+- `manage-pre-task.sh` / `manage-post-task.sh` 升级为阶段感知（Phase 0-5 各自不同 checklist）
+- `manage.md` 瘦身：Phase 1-5 提取到 `shared/manage-phases.md`，748→426 行（减少 43%），懒加载
+- Phase 0.5 初始化新增 `runtime-protocol.md` + `phase-gate.md`（各阶段门控表）
+- 5-Question Reboot Check 升级为 8 问，答不上来强制读磁盘协议文件
 
 ### 2026-03-13 (v1.12.1 - version alignment)
 - 版本号对齐，触发插件端 `/plugin update` 更新分发

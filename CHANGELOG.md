@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.12.2] - 2026-03-13
+
+### ✨ 增强
+
+- `manage` 上下文韧性增强：压缩后 hook 自动重注入协议，防止 Lead 忘记工作流规则
+- 新增 `manage-context-anchor.sh`：挂载到 `Write|Edit` PreToolUse，输出当前阶段允许/禁止动作（来自磁盘 `phase-gate.md`，不受压缩影响）
+- `manage-pre-task.sh` / `manage-post-task.sh` 升级为阶段感知：按 Phase 0-5 输出不同协议提醒
+- `manage.md` 瘦身：Phase 1-5 详细流程提取到 `shared/manage-phases.md`，命令本体从 748 行减至 426 行（减少 43%）；进入 Phase 1 时懒加载
+- Phase 0.5 初始化新增写入 `runtime-protocol.md` + `phase-gate.md`（各阶段允许动作/禁止动作/必更新文件/Hard Stop）
+- 5-Question Reboot Check 升级为 8 问：新增第 6-8 问（当前允许动作/禁止动作/worker 返回后必更新文件），答不上来强制先读 `runtime-protocol.md` + `phase-gate.md`
+
+---
+
 ## [1.12.1] - 2026-03-13
 
 ### 🔧 维护
