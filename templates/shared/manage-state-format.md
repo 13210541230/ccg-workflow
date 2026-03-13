@@ -4,8 +4,6 @@
 
 ## 目录结构
 
-- `runtime-protocol.md`
-- `phase-gate.md`
 - `task_plan.md`
 - `decisions.md`
 - `progress.md`
@@ -15,16 +13,6 @@
 - `codex-sessions/`
 
 `codex-sessions/` 用于保存 `ccg-codex` MCP 的底层会话状态与持久化输出。复杂任务中，Lead 先复用上层 codex worker，再由 worker 复用它绑定的 Codex session。默认运行时是 `subagent`；只有显式 Team 模式才会额外创建 Agent Team。
-
-## 流程协议文件
-
-| 文件 | 用途 | 更新频率 |
-|------|------|----------|
-| `runtime-protocol.md` | `/ccg:manage` 的长期流程铁律与恢复顺序 | 创建任务时写入，通常只读 |
-| `phase-gate.md` | 当前阶段允许动作、禁止动作、Hard Stop、恢复必读文件 | 每次阶段切换必更新 |
-
-`runtime-protocol.md` 应从 `templates/shared/manage-runtime-protocol.md` 复制。  
-`phase-gate.md` 应参考 `templates/shared/manage-phase-gates.md` 生成当前阶段的短合同。
 
 ## 四个状态文件
 
@@ -136,40 +124,6 @@
 |------|------|------|------|------|------|
 ```
 
-## phase-gate.md 模板
-
-```markdown
-# Phase Gate: <任务名>
-
-Current Phase: <initializing|discussing|analyzing|planning|confirmed|executing|testing|reviewing|blocked|complete>
-Next Allowed Action: <一句话描述当前唯一合法的下一类动作>
-Hard Stop: <yes|no>
-
-## Allowed Actions
-- <当前允许的动作 1>
-- <当前允许的动作 2>
-
-## Forbidden Actions
-- <当前禁止的动作 1>
-- <当前禁止的动作 2>
-
-## Required Reads Before Decision
-- runtime-protocol.md
-- progress.md
-- findings.md
-- <必要时加上 task_plan.md / decisions.md / 某个 artifact>
-
-## Exit Criteria
-- <离开当前阶段必须满足的条件 1>
-- <离开当前阶段必须满足的条件 2>
-
-## After Worker Returns
-- append key findings to findings.md
-- update progress.md timeline and status
-- sync worker/session registry
-- read task_plan.md + progress.md before any routing decision
-```
-
 ## findings.md 模板
 
 ```markdown
@@ -267,10 +221,3 @@ Hard Stop: <yes|no>
 - 只有当 `simple-executor` 可复用时，才继续向同一简单执行线程发送修复请求
 - 若某角色出现空输出、角色混用、输出损坏，应同时将该 worker 和绑定 session 标记为 `可复用=no`
 - 只有 Team 模式下缺失 `Team Name`、`Team Lead Name` 或 `Teammate Name`，才视为未正确进入 Agent Teams 路径
-
-## 恢复规则
-
-- 会话恢复、自动压缩或长时间中断后，先读 `runtime-protocol.md`，再读 `phase-gate.md`
-- 若 `phase-gate.md` 缺失或内容与 `progress.md` 状态不一致，先修复 `phase-gate.md`，再继续执行
-- 只有当 Lead 能回答 `runtime-protocol.md` 中的 8 个 Reboot Check 问题时，才允许继续下一步
-- `phase-gate.md` 必须明确当前 `Hard Stop`；若为 `yes`，Lead 不得越过用户确认或阻塞处理直接推进阶段

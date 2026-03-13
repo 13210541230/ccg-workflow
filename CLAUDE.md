@@ -1,19 +1,12 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-12 (v1.12.0)
+**Last Updated**: 2026-03-12 (v1.11.0)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
-
-### 2026-03-12 (v1.12.0 - manage runtime protocol + phase gates)
-- `/ccg:manage` 新增任务级 `runtime-protocol.md` 与 `phase-gate.md`，把长期铁律、当前阶段允许动作、禁止动作、Hard Stop、恢复顺序落盘，不再主要依赖会话内记忆
-- 新增共享模板 `manage-runtime-protocol.md` / `manage-phase-gates.md`，定义 reboot 顺序、8 项 Reboot Check、验证门和各阶段 gate 合同
-- `manage-state-format.md` 扩展为包含流程协议文件与 `phase-gate.md` 模板，恢复时要求先校验协议层与 `progress.md` 一致
-- `manage-pre-task.sh` / `manage-post-task.sh` 改为注入“当前阶段 + 下一合法动作 + 禁止动作 + Hard Stop + 必读文件”，降低超大任务自动压缩后的流程失忆风险
-- `manage.md` 进一步收口为轻量编排入口，阶段切换要求同步更新 `progress.md` 与 `phase-gate.md`
 
 ### 2026-03-12 (v1.11.0 - plugin absorption + workflow enhancement)
 - 新增 3 个 CCG 内置审查 Agent：`architect-reviewer` / `code-quality-reviewer` / `security-reviewer`，消除 `comprehensive-review` 外部插件依赖
