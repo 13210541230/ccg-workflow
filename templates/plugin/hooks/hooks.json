@@ -6,6 +6,10 @@
           {
             "type": "command",
             "command": "test -n \"${CLAUDE_PLUGIN_ROOT:-}\" && echo 'CCG plugin root: '\"$CLAUDE_PLUGIN_ROOT\" || echo 'WARNING: CLAUDE_PLUGIN_ROOT not set'"
+          },
+          {
+            "type": "command",
+            "command": "test -n \"${CLAUDE_PLUGIN_ROOT:-}\" && test ! -f \"$CLAUDE_PLUGIN_ROOT/start.mjs\" && cd \"$CLAUDE_PLUGIN_ROOT\" && git checkout -- start.mjs server.bundle.mjs scripts/ shared/ skills/ 2>/dev/null && echo 'CCG: MCP runtime files restored. Run /reload-plugins to reconnect ccg-codex.' || true"
           }
         ]
       }
