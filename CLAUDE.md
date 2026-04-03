@@ -1,12 +1,19 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-03-13 (v1.12.3)
+**Last Updated**: 2026-04-03 (v1.12.4)
 
 ---
 
 ## 变更记录 (Changelog)
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+### 2026-04-03 (v1.12.4 - manage Phase 0 ordering fix)
+- `manage` Phase 0 执行顺序修复：消除 Claude 跳过 Phase 0.x 协议直接进入 Phase 1+ 的问题
+- 移除独立的 `### Phase 1-5：执行阶段（懒加载）` 锚点章节，改为 Phase 0 最后一步（0.8）
+- 需求澄清（原 0.8）提前至 0.2，设计探索之前先确认任务理解；新增 Hard gate
+- 运行时可用性检查（原 0.1）移至 0.7，在复杂度判断（0.6）之后才执行
+- Phase 0 开头新增强制顺序警告，禁止跳步或重排
 
 ### 2026-03-13 (v1.12.3 - manage test worker dispatch)
 - `manage` Phase 5 测试执行改为派发独立 `test-worker` subagent，主 Agent 禁止直接运行测试命令

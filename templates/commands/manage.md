@@ -116,6 +116,8 @@ Lead 禁止因为内容“看起来合理”就接受没有 Codex 证据的 work
 
 ### Phase 0：初始化
 
+> **⚠️ 强制执行顺序**：必须严格按 0.0 → 0.1 → … → 0.8 顺序完整执行所有子步骤，禁止跳过或重排任何步骤。Phase 1-5 协议在步骤 0.8 读取，是 Phase 0 的收尾动作，不是可选懒加载入口。在 Phase 0 全部完成之前，禁止执行任何 Phase 1+ 的工作。
+
 #### 0.0 解析 Plugin Root
 
 ```
@@ -127,23 +129,24 @@ Bash({
 
 保存为 `PLUGIN_ROOT`。若未找到则终止。
 
-#### 0.1 运行时可用性检查
-
-复杂任务开始前至少验证一次：
-
-```
-mcp__ccg-codex__codex_session_list({})
-```
-
-用途仅限运行时健康检查。若该工具不可用，则记录为 `runtime blocked` 并停止复杂路径。
-
-#### 0.2 会话恢复检测
+#### 0.1 会话恢复检测
 
 ```
 Glob({ pattern: ".claude/plan/*/progress.md" })
 ```
 
-若发现未完成会话（状态非 `complete`），询问用户是否继续。
+若发现未完成会话（状态非 `complete`），询问用户是否继续。若继续，直接恢复至对应阶段，跳过后续 Phase 0 步骤。
+
+#### 0.2 需求澄清
+
+在开始设计探索前，确认任务理解无歧义：
+
+问题纪律：
+- **每次只问一个问题**（不得一次性列出多个问题）
+- **优先选择题**：提供 2-3 个选项而非开放问题
+- 清晰循环：用户回答后，重新陈述理解，确认再继续
+
+**Hard gate**：用户明确确认任务理解后，方可进入 0.3。
 
 #### 0.3 Prompt 增强 + 设计探索
 
@@ -188,7 +191,7 @@ Read({ file_path: "<PLUGIN_ROOT>/shared/manage-state-format.md" })
 - 允许动作: 创建状态文件, 读取上下文, 调用 sequential-thinking, 复杂度评估
 - 禁止动作: 修改产品源码, 派发 worker, 直接调用 Codex session
 - Worker返回后必更新: progress.md
-- Hard Stop: 推荐方案未用户确认前禁止进入 Phase 1
+- Hard Stop: 步骤 0.8 (读取 manage-phases.md) 完成前禁止进入 Phase 1
 
 ## Phase 1 (分析)
 - 允许动作: 派发 analyzer worker (subagent), 写入 inputs/, 合并 analysis 到 findings.md
@@ -225,6 +228,8 @@ Read({ file_path: "<PLUGIN_ROOT>/shared/manage-state-format.md" })
 - `artifacts/`
 - `codex-sessions/`
 
+状态目录创建完成后，立即将 0.2 澄清结论、0.3 设计方案、0.4 任务拆解写入 `task_plan.md` 和 `findings.md`。
+
 #### 0.6 复杂度评估
 
 | 指标 | 简单 | 复杂 |
@@ -248,7 +253,17 @@ Read({ file_path: "<PLUGIN_ROOT>/shared/manage-state-format.md" })
 - `agent_type: general-purpose | agent_name: simple-executor | sandbox: workspace-write | status: ready`
 - `agent_type: general-purpose | agent_name: test-worker | sandbox: workspace-write | status: ready`
 
-#### 0.7 复杂任务初始化 Codex worker 槽位
+#### 0.7 运行时可用性检查
+
+**仅复杂任务执行**（由 0.6 判定为 `complex` 后才执行此步骤）：
+
+```
+mcp__ccg-codex__codex_session_list({})
+```
+
+用途仅限运行时健康检查。若该工具不可用，则记录为 `runtime blocked` 并停止复杂路径。
+
+#### 0.7.1 复杂任务初始化 Codex worker 槽位
 
 仅复杂任务执行。先初始化以下逻辑槽位并写入 `progress.md` / 注册表：
 - `analyzer-a`
@@ -269,7 +284,7 @@ Read({ file_path: "<PLUGIN_ROOT>/shared/manage-state-format.md" })
 
 不要在 Lead 中直接创建这些 Codex session；由具体 worker 在首次运行时内部 `ensure`。
 
-#### 0.7.1 可选 Team 模式
+#### 0.7.2 可选 Team 模式
 
 只有满足以下条件时，才允许把某个复杂角色切到 Team 模式：
 - 用户显式要求使用 Agent Teams
@@ -292,26 +307,17 @@ TeamCreate({
 
 若 TeamCreate 不可用或未返回 `team_name`，只阻塞 Team 模式；默认 subagent 路径仍可继续。
 
-#### 0.8 讨论与需求澄清
+#### 0.8 加载 Phase 1-5 协议（Phase 0 收尾）
 
-问题纪律：
-- **每次只问一个问题**（不得一次性列出多个问题）
-- **优先选择题**：提供 2-3 个选项而非开放问题
-- 清晰循环：用户回答后，重新陈述理解，确认再继续
-
----
-
-### Phase 1-5：执行阶段（懒加载）
-
-**进入 Phase 1 前必须执行**：
+Phase 0 所有步骤已完成，现在读取执行阶段协议：
 
 ```
 Read({ file_path: "<PLUGIN_ROOT>/shared/manage-phases.md" })
 ```
 
-该文件包含 Phase 1（分析）/ Phase 2（规划）/ Phase 3（实施）/ Phase 4（审查）/ Phase 5（测试）的完整 worker 派发模板、证据校验规则、止损协议和完成条件。读取后按其指引执行对应阶段。
+该文件包含 Phase 1（分析）/ Phase 2（规划）/ Phase 3（实施）/ Phase 4（审查）/ Phase 5（测试）的完整 worker 派发模板、证据校验规则、止损协议和完成条件。读取后按其内容进入 Phase 1。
 
-> 懒加载设计：Phase 1-5 详情不在命令初始化时占用上下文，仅在实际进入执行阶段时读入。
+> **此步骤不可提前执行**：仅在完成 0.0-0.7.2 所有步骤后才允许读取此文件。Phase 0 未完整执行前禁止读取 manage-phases.md。
 
 ---
 
