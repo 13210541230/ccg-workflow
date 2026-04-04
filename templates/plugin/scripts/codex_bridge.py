@@ -215,7 +215,7 @@ def configure_windows_stdio() -> None:
 def _build_command(args: argparse.Namespace, prompt: str) -> List[str]:
     backend = args.backend
     if backend == "codex":
-        cmd = ["codex", "exec", "--sandbox", args.sandbox, "--cd", args.cd, "--json"]
+        cmd = ["mycodex", "exec", "--sandbox", args.sandbox, "--cd", args.cd, "--json"]
 
         if args.image:
             cmd.extend(["--image", ",".join(args.image)])

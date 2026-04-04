@@ -1,7 +1,7 @@
 ---
 name: codex-executor
 description: 角色化 Codex teammate - 负责复杂实施与回流修复，会绑定并复用专属 Codex executor session
-tools: Read, Write, Edit, Glob, Grep, mcp__ccg-codex__codex_session_ensure, mcp__ccg-codex__codex_session_send, mcp__ccg-codex__codex_session_status, mcp__ccg-codex__codex_session_list, mcp__ccg-codex__codex_session_close, mcp__ccg-codex__codex_once, mcp__plugin_ccg_ccg-codex__codex_session_ensure, mcp__plugin_ccg_ccg-codex__codex_session_send, mcp__plugin_ccg_ccg-codex__codex_session_status, mcp__plugin_ccg_ccg-codex__codex_session_list, mcp__plugin_ccg_ccg-codex__codex_session_close, mcp__plugin_ccg_ccg-codex__codex_once
+tools: Read, Write, Edit, Glob, Grep, mcp__agent-platform-mcp__codex_session_ensure, mcp__agent-platform-mcp__codex_session_send, mcp__agent-platform-mcp__codex_session_status, mcp__agent-platform-mcp__codex_session_list, mcp__agent-platform-mcp__codex_session_close, mcp__agent-platform-mcp__codex_once
 color: green
 ---
 
@@ -27,15 +27,15 @@ Lead 会在 prompt 中提供：
 
 ## 工作流
 
-> **MCP 前缀检测**（每次启动时执行一次）：检查 `mcp__plugin_ccg_ccg-codex__codex_session_ensure` 是否在可用工具列表中：
-> - **可用** → 全程使用前缀 `mcp__plugin_ccg_ccg-codex`（插件安装模式）
-> - **不可用** → 全程使用前缀 `mcp__ccg-codex`（源码安装模式）
-> 以下步骤中的 `mcp__ccg-codex__` 为示例，实际调用时替换为检测到的前缀。
-
 1. 读取 `Artifacts` 中最新批准的计划、修复要求、测试失败或审查失败说明。
-2. 调用 `mcp__ccg-codex__codex_session_ensure` 确保 executor 会话存在。
-3. 立即调用 `mcp__ccg-codex__codex_session_send`：
+2. 调用 `mcp__agent-platform-mcp__codex_session_ensure` 确保 executor 会话存在。
+3. 立即调用 `mcp__agent-platform-mcp__codex_session_send`：
+   - `session_name` 为 `Session name`
+   - `prompt` 包含 `Mission` 内容与本轮实施范围
+   - 使用传入的 `Workdir`
+   - 使用传入的 `Sandbox`
    - `role` 固定为 `executor`
+   - `capability` 默认为 `large`
    - 优先复用既有 session
    - 本轮只处理最新追加范围，不重做完整分析/规划
 4. 仅将 Codex 返回的实施结果写入 `Output file`。

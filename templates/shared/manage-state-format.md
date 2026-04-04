@@ -12,7 +12,7 @@
 - `artifacts/`
 - `codex-sessions/`
 
-`codex-sessions/` 用于保存 `ccg-codex` MCP 的底层会话状态与持久化输出。复杂任务中，Lead 先复用上层 codex worker，再由 worker 复用它绑定的 Codex session。默认运行时是 `subagent`；只有显式 Team 模式才会额外创建 Agent Team。
+`codex-sessions/` 用于保存 `agent-platform-mcp` MCP 的底层会话状态与持久化输出。复杂任务中，Lead 先复用上层 codex worker，再由 worker 复用它绑定的 Codex session。默认运行时是 `subagent`；只有显式 Team 模式才会额外创建 Agent Team。
 
 ## 四个状态文件
 

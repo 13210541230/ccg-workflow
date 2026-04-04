@@ -7,11 +7,5 @@
   },
   "repository": "https://github.com/anthropics/ccg-workflow",
   "license": "MIT",
-  "keywords": ["multi-model", "codex", "gemini", "workflow", "collaboration"],
-  "mcpServers": {
-    "ccg-codex": {
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/start.mjs"]
-    }
-  }
+  "keywords": ["multi-model", "codex", "gemini", "workflow", "collaboration"]
 }

@@ -15,7 +15,7 @@ $ARGUMENTS
 - **简单任务走单 worker agent**：低复杂度任务由单个 Claude worker agent 完成分析、最小规划、实施与自检，Lead 不亲自改码
 - **复杂任务默认走角色化 subagent**：复杂分析、规划、实施、审查默认派发给 `ccg:codex-*` subagent，由 subagent 自己加载角色定义并与 Codex 协作
 - **TeamCreate 是可选实验路径**：仅当用户显式要求 Team 模式，或你确认当前运行时能为 team-agent 正确注入角色定义时，才允许使用 `TeamCreate`
-- **禁止主 Agent 直派发 Codex 任务**：Lead 不直接对复杂角色调用 `mcp__ccg-codex__codex_session_send`
+- **禁止主 Agent 直派发 Codex 任务**：Lead 不直接对复杂角色调用 `mcp__agent-platform-mcp__codex_session_send`
 - **两层连续性**：Lead 优先复用同一个 `codex-*` worker；worker 再优先复用同一个 Codex session
 - **角色分离**：复杂任务默认存在 `analyzer-a`、`analyzer-b`、`planner-a`、`planner-b`、`executor`、`reviewer-a`、`reviewer-b`
 - **验证先于完成**：Lead 只有在 worker 返回了有效的 Codex 证据后，才允许接受其阶段产出
@@ -83,7 +83,7 @@ test-worker 不需要 Codex 证据校验，但必须满足：
 | `reviewer-*` | `ccg:codex-reviewer` | 独立审查、回归风险、可维护性校验 |
 
 这些 worker 不是 Codex 本体，而是 **Claude 可调度的长期代理**。  
-默认运行时是 `subagent`，即通过 `Agent({ subagent_type: "ccg:codex-*" })` 直接加载角色定义；若显式启用 Team 模式，则用 `team_name + name + subagent_type` 创建对应 team-agent。两种模式下都必须由 worker 内部通过 `ccg-codex` MCP 维护自己的 `session_name / session_id`。
+默认运行时是 `subagent`，即通过 `Agent({ subagent_type: "ccg:codex-*" })` 直接加载角色定义；若显式启用 Team 模式，则用 `team_name + name + subagent_type` 创建对应 team-agent。两种模式下都必须由 worker 内部通过 `agent-platform-mcp` MCP 维护自己的 `session_name / session_id`。
 
 ### Codex 证据校验
 
@@ -258,7 +258,7 @@ Read({ file_path: "<PLUGIN_ROOT>/shared/manage-state-format.md" })
 **仅复杂任务执行**（由 0.6 判定为 `complex` 后才执行此步骤）：
 
 ```
-mcp__ccg-codex__codex_session_list({})
+mcp__agent-platform-mcp__codex_session_list({})
 ```
 
 用途仅限运行时健康检查。若该工具不可用，则记录为 `runtime blocked` 并停止复杂路径。
@@ -419,7 +419,7 @@ Read({ file_path: "<PLUGIN_ROOT>/shared/manage-phases.md" })
 
 | 异常场景 | 决策 |
 |----------|------|
-| `ccg-codex` MCP 不可用 | 复杂任务直接阻塞，不能改成 Lead 直连 Codex |
+| `agent-platform-mcp` MCP 不可用 | 复杂任务直接阻塞，不能改成 Lead 直连 Codex |
 | `TeamCreate` 不可用或失败 | 仅阻塞显式 Team 模式；默认 subagent 路径仍可继续 |
 | worker 返回缺少 `runtime_mode/session_id/reuse_eligible/output_file` | 视为 `codex bypass`，当前阶段结果无效，必须重试或阻塞 |
 | Team 模式返回缺少 `team_name/teammate_name` | 视为 `role injection missing`，当前阶段结果无效 |

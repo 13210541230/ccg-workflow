@@ -1,7 +1,7 @@
 ---
 name: codex-reviewer
 description: 角色化 Codex teammate - 负责独立审查，会绑定并复用专属 Codex reviewer session
-tools: Read, Write, Edit, Glob, Grep, mcp__ccg-codex__codex_session_ensure, mcp__ccg-codex__codex_session_send, mcp__ccg-codex__codex_session_status, mcp__ccg-codex__codex_session_list, mcp__ccg-codex__codex_session_close, mcp__ccg-codex__codex_once, mcp__plugin_ccg_ccg-codex__codex_session_ensure, mcp__plugin_ccg_ccg-codex__codex_session_send, mcp__plugin_ccg_ccg-codex__codex_session_status, mcp__plugin_ccg_ccg-codex__codex_session_list, mcp__plugin_ccg_ccg-codex__codex_session_close, mcp__plugin_ccg_ccg-codex__codex_once
+tools: Read, Write, Edit, Glob, Grep, mcp__agent-platform-mcp__codex_session_ensure, mcp__agent-platform-mcp__codex_session_send, mcp__agent-platform-mcp__codex_session_status, mcp__agent-platform-mcp__codex_session_list, mcp__agent-platform-mcp__codex_session_close, mcp__agent-platform-mcp__codex_once
 color: magenta
 ---
 
@@ -27,15 +27,15 @@ Lead 会在 prompt 中提供：
 
 ## 工作流
 
-> **MCP 前缀检测**（每次启动时执行一次）：检查 `mcp__plugin_ccg_ccg-codex__codex_session_ensure` 是否在可用工具列表中：
-> - **可用** → 全程使用前缀 `mcp__plugin_ccg_ccg-codex`（插件安装模式）
-> - **不可用** → 全程使用前缀 `mcp__ccg-codex`（源码安装模式）
-> 以下步骤中的 `mcp__ccg-codex__` 为示例，实际调用时替换为检测到的前缀。
-
 1. 读取 `Artifacts` 中的 diff、计划、审查请求与必要上下文。
-2. 用 `mcp__ccg-codex__codex_session_ensure` 绑定 reviewer 会话。
-3. 立即用 `mcp__ccg-codex__codex_session_send`：
+2. 用 `mcp__agent-platform-mcp__codex_session_ensure` 绑定 reviewer 会话。
+3. 立即用 `mcp__agent-platform-mcp__codex_session_send`：
+   - `session_name` 为 `Session name`
+   - `prompt` 包含 `Mission` 内容与待审查范围
+   - 使用传入的 `Workdir`
+   - 使用传入的 `Sandbox`
    - `role` 固定为 `reviewer`
+   - `capability` 默认为 `medium`
    - 聚焦 correctness / safety / maintainability / regression risk
 4. 仅将结构化审查结果写入 `Output file`。
 5. 返回简短审查摘要，至少包含：

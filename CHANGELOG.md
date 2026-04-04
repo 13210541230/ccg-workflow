@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.12.5] - 2026-04-03
+
+### Changed
+- 移除 ccg-workflow 内置 `ccg-codex` MCP server，统一使用独立 `agent-platform-mcp` 仓库
+- 删除 `templates/plugin/start.mjs`、`templates/plugin/scripts/ccg_codex_mcp.py`、`src/plugin/ccg-codex-server.mjs`
+- `templates/plugin/.mcp.json` 清空 mcpServers，`templates/plugin/plugin.json` 移除 mcpServers 字段
+- `templates/plugin/hooks/hooks.json` 移除 git-restore SessionStart hook（不再需要恢复 MCP 运行时文件）
+- `scripts/build-plugin.mjs` 移除 esbuild 步骤（不再打包 MCP server bundle）
+- 4 个角色化 agent（codex-analyzer/planner/executor/reviewer）工具前缀从双前缀切换为单一 `mcp__agent-platform-mcp__`，移除 MCP 前缀检测逻辑，移除 `state_dir` 参数，新增 `capability` 参数
+- `manage.md`、`shared/teammate-bus-format.md`、`shared/manage-state-format.md` 更新 MCP 名称引用
+
+---
+
 ## [1.12.4] - 2026-04-03
 
 ### 🐛 修复

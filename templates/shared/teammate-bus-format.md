@@ -101,7 +101,7 @@
 
 规则：
 - 各角色 teammate spawn 成功后立即登记
-- 各角色 teammate 通过 `ccg-codex` MCP 的 `codex_session_ensure` / `codex_session_send` 维护底层 session
+- 各角色 teammate 通过 `agent-platform-mcp` MCP 的 `codex_session_ensure` / `codex_session_send` 维护底层 session
 - `analyzer / planner / executor / reviewer` 必须保留各自独立的 `agent_id` 和 `session_id`
 - 建议同时记录 `session_name`，供 MCP 工具稳定复用
 - 复杂分析优先看 `analyzer.reuse_eligible`

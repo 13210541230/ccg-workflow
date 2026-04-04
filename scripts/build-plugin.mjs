@@ -13,16 +13,13 @@
  *   5. templates/shared/ → dist/plugin/shared/ (变量替换 + 路径替换)
  *   6. templates/plugin/plugin.json → dist/plugin/.claude-plugin/plugin.json (注入版本号)
  *   7. templates/plugin/.mcp.json → dist/plugin/.mcp.json
- *   8. templates/plugin/start.mjs → dist/plugin/start.mjs
- *   9. templates/plugin/packs/manifest.template.json + 可选命令模板 → dist/plugin/packs/
- *  10. src/plugin/ccg-codex-server.mjs → dist/plugin/server.bundle.mjs
- *  11. templates/plugin/hooks/ → dist/plugin/hooks/
- *  12. templates/plugin/scripts/ → dist/plugin/scripts/ (codex_bridge.py 等)
+ *   8. templates/plugin/packs/manifest.template.json + 可选命令模板 → dist/plugin/packs/
+ *   9. templates/plugin/hooks/ → dist/plugin/hooks/
+ *  10. templates/plugin/scripts/ → dist/plugin/scripts/ (codex_bridge.py 等)
  */
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { build } from 'esbuild'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -37,7 +34,6 @@ const OUTPUT_STYLES_DIR = path.join(TEMPLATES_DIR, 'output-styles')
 const PLUGIN_TEMPLATE_DIR = path.join(TEMPLATES_DIR, 'plugin')
 const SKILLS_DIR = path.join(TEMPLATES_DIR, 'skills')
 const PACK_MANIFEST_TEMPLATE = path.join(PLUGIN_TEMPLATE_DIR, 'packs', 'manifest.template.json')
-const MCP_SERVER_SOURCE = path.join(ROOT, 'src', 'plugin', 'ccg-codex-server.mjs')
 const SOURCE_ONLY_COMMAND_FILES = new Set([
   'workflow.md',
   'feat.md',
@@ -149,16 +145,10 @@ async function main() {
   // 7. 写入 plugin 配置
   await writePluginConfigs(outDir)
 
-  // 8. 复制插件根运行时文件（start.mjs）
-  await copyPluginRootRuntimeFiles(outDir)
-
-  // 9. 构建可选命令包
+  // 8. 构建可选命令包
   await buildPacks(outDir)
 
-  // 10. 构建 MCP server bundle
-  await buildPluginMcpServer(outDir)
-
-  // 11. 复制 shared（多模型调用规范、共享工作流、子Agent prompts）
+  // 9. 复制 shared（多模型调用规范、共享工作流、子Agent prompts）
   const sharedDir = path.join(TEMPLATES_DIR, 'shared')
   try {
     await copyDirWithTransform(sharedDir, path.join(outDir, 'shared'))
@@ -168,10 +158,10 @@ async function main() {
     log(`  shared: 目录不存在，跳过`)
   }
 
-  // 12. 复制 hooks
+  // 10. 复制 hooks
   await copyDir(path.join(PLUGIN_TEMPLATE_DIR, 'hooks'), path.join(outDir, 'hooks'))
 
-  // 13. 复制 scripts（codex_bridge.py + manage 钩子等），强制 LF 行尾
+  // 11. 复制 scripts（codex_bridge.py + manage 钩子等），强制 LF 行尾
   const scriptsDir = path.join(PLUGIN_TEMPLATE_DIR, 'scripts')
   try {
     await copyDirWithLF(scriptsDir, path.join(outDir, 'scripts'))
@@ -181,7 +171,7 @@ async function main() {
     log(`  scripts: 目录不存在，跳过`)
   }
 
-  // 14. 复制 skills
+  // 12. 复制 skills
   try {
     await copyDirWithTransform(SKILLS_DIR, path.join(outDir, 'skills'))
     log(`  skills: templates/skills/ → skills/`)
@@ -190,7 +180,7 @@ async function main() {
     log(`  skills: 目录不存在，跳过`)
   }
 
-  // 15. 验证输出
+  // 13. 验证输出
   const warnings = await validateOutput(outDir)
 
   console.log(`[build-plugin] 完成: ${cmdCount} commands, ${agentCount} agents`)
@@ -325,30 +315,6 @@ async function buildPacks(dir) {
     JSON.stringify(outputManifest, null, 2) + '\n',
     'utf-8',
   )
-}
-
-async function copyPluginRootRuntimeFiles(dir) {
-  const runtimeFiles = ['start.mjs']
-  for (const file of runtimeFiles) {
-    await fs.copyFile(
-      path.join(PLUGIN_TEMPLATE_DIR, file),
-      path.join(dir, file),
-    )
-    log(`  runtime: ${file}`)
-  }
-}
-
-async function buildPluginMcpServer(dir) {
-  await build({
-    entryPoints: [MCP_SERVER_SOURCE],
-    outfile: path.join(dir, 'server.bundle.mjs'),
-    bundle: true,
-    format: 'esm',
-    platform: 'node',
-    target: 'node18',
-    logLevel: verbose ? 'info' : 'silent',
-  })
-  log(`  runtime: server.bundle.mjs`)
 }
 
 /**

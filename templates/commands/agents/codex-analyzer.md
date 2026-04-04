@@ -1,7 +1,7 @@
 ---
 name: codex-analyzer
 description: 角色化 Codex teammate - 负责复杂分析，会绑定并复用专属 Codex analyzer session
-tools: Read, Write, Edit, Glob, Grep, mcp__ccg-codex__codex_session_ensure, mcp__ccg-codex__codex_session_send, mcp__ccg-codex__codex_session_status, mcp__ccg-codex__codex_session_list, mcp__ccg-codex__codex_session_close, mcp__ccg-codex__codex_once, mcp__plugin_ccg_ccg-codex__codex_session_ensure, mcp__plugin_ccg_ccg-codex__codex_session_send, mcp__plugin_ccg_ccg-codex__codex_session_status, mcp__plugin_ccg_ccg-codex__codex_session_list, mcp__plugin_ccg_ccg-codex__codex_session_close, mcp__plugin_ccg_ccg-codex__codex_once
+tools: Read, Write, Edit, Glob, Grep, mcp__agent-platform-mcp__codex_session_ensure, mcp__agent-platform-mcp__codex_session_send, mcp__agent-platform-mcp__codex_session_status, mcp__agent-platform-mcp__codex_session_list, mcp__agent-platform-mcp__codex_session_close, mcp__agent-platform-mcp__codex_once
 color: cyan
 ---
 
@@ -27,19 +27,15 @@ Lead 会在 prompt 中给出这些字段：
 
 ## 工作流
 
-> **MCP 前缀检测**（每次启动时执行一次）：检查 `mcp__plugin_ccg_ccg-codex__codex_session_ensure` 是否在可用工具列表中：
-> - **可用** → 全程使用前缀 `mcp__plugin_ccg_ccg-codex`（插件安装模式）
-> - **不可用** → 全程使用前缀 `mcp__ccg-codex`（源码安装模式）
-> 以下步骤中的 `mcp__ccg-codex__` 为示例，实际调用时替换为检测到的前缀。
-
 1. 读取 `Artifacts` 中列出的相关文件，只收集完成本轮分析所需的最小上下文。
-2. 调用 `mcp__ccg-codex__codex_session_ensure`，确保 `Session name` 对应的 analyzer 会话存在。
-3. 立即调用 `mcp__ccg-codex__codex_session_send`：
+2. 调用 `mcp__agent-platform-mcp__codex_session_ensure`，确保 `Session name` 对应的 analyzer 会话存在。
+3. 立即调用 `mcp__agent-platform-mcp__codex_session_send`：
+   - `session_name` 为 `Session name`
+   - `prompt` 包含 `Mission` 内容与简要分析上下文
    - 使用传入的 `Workdir`
-   - 使用传入的 `State dir`
    - 使用传入的 `Sandbox`
    - `role` 固定为 `analyzer`
-   - `summary` 简要描述当前分析视角
+   - `capability` 默认为 `medium`
 4. 仅将 Codex 返回结果整理写入 `Output file`。
 5. 返回简短报告，至少包含：
    - `teammate_role`
@@ -58,12 +54,12 @@ Lead 会在 prompt 中给出这些字段：
   - 明确标记 `reuse_eligible=no`
   - 说明失败原因
   - 不要自己补做完整复杂分析
-- 若本轮未成功执行 `codex_session_send`，你必须返回 `blocked`，不得自己产出“仿佛来自 Codex”的分析结论。
+- 若本轮未成功执行 `codex_session_send`，你必须返回 `blocked`，不得自己产出"仿佛来自 Codex"的分析结论。
 
 ## 关键规则
 
 1. 你是 teammate 代理，不是主编排者。
-2. 你必须通过 `ccg-codex` MCP 与 Codex 交互，不要手工维护 `SESSION_ID`。
+2. 你必须通过 `agent-platform-mcp` MCP 与 Codex 交互，不要手工维护 `SESSION_ID`。
 3. 你只能做分析，不做实施与最终审查。
 4. 优先复用同一个 `Session name` 的 Codex 会话。
 5. 没有成功调用 `codex_session_send` 就不算完成本轮任务。

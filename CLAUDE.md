@@ -1,10 +1,16 @@
 # CCG Multi-Model Collaboration System (ccg-workflow)
 
-**Last Updated**: 2026-04-03 (v1.12.4)
+**Last Updated**: 2026-04-03 (v1.12.5)
 
 ---
 
 ## 变更记录 (Changelog)
+
+### 2026-04-03 (v1.12.5 - migrate to agent-platform-mcp)
+- 移除内置 `ccg-codex` MCP server，统一使用独立 `agent-platform-mcp` 仓库（纯 Python + 官方 MCP SDK）
+- 4 个角色化 agent 工具前缀切换为 `mcp__agent-platform-mcp__`，移除双前缀检测逻辑，新增 `capability` 参数
+- 删除 `start.mjs`、`ccg_codex_mcp.py`、`ccg-codex-server.mjs`，`build-plugin.mjs` 移除 esbuild 打包步骤
+- `agent-platform-mcp` 注册在 `~/.claude.json`，永久生效，不受插件安装器干扰
 
 > 完整变更历史请查看 [CHANGELOG.md](./CHANGELOG.md)
 

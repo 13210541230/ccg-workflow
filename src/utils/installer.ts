@@ -157,7 +157,7 @@ const WORKFLOW_CONFIGS: WorkflowConfig[] = [
     name: 'Codex 直连',
     nameEn: 'Codex Direct',
     category: 'development',
-    commands: ['codex'],
+    commands: ['mycodex'],
     defaultSelected: true,
     order: 9.2,
     description: '直接调用运行时后端',

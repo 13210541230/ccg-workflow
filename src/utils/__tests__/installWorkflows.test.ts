@@ -119,8 +119,8 @@ describe('installWorkflows E2E — mcpProvider="skip"', () => {
 
   it('keeps active codex teammate agents installed', async () => {
     const content = readFileSync(join(tmpDir, 'agents', 'ccg', 'codex-analyzer.md'), 'utf-8')
-    expect(content).toContain('mcp__ccg-codex__codex_session_ensure')
-    expect(content).toContain('mcp__ccg-codex__codex_session_send')
+    expect(content).toContain('mcp__agent-platform-mcp__codex_session_ensure')
+    expect(content).toContain('mcp__agent-platform-mcp__codex_session_send')
   })
 
   it('installs optional command pack assets for packs command', async () => {
@@ -161,7 +161,7 @@ describe('installWorkflows E2E — mcpProvider="fast-context" (default)', () => 
 
   it('keeps active codex teammate agents stable under fast-context install', async () => {
     const analyzerContent = readFileSync(join(tmpDir, 'agents', 'ccg', 'codex-analyzer.md'), 'utf-8')
-    expect(analyzerContent).toContain('mcp__ccg-codex__codex_session_ensure')
+    expect(analyzerContent).toContain('mcp__agent-platform-mcp__codex_session_ensure')
     expect(analyzerContent).not.toContain('{{MCP_SEARCH_TOOL}}')
   })
 })
@@ -192,7 +192,7 @@ describe('installWorkflows E2E — mcpProvider="ace-tool" (explicit)', () => {
 
   it('keeps active codex teammate agents stable under ace-tool install', async () => {
     const analyzerContent = readFileSync(join(tmpDir, 'agents', 'ccg', 'codex-analyzer.md'), 'utf-8')
-    expect(analyzerContent).toContain('mcp__ccg-codex__codex_session_ensure')
+    expect(analyzerContent).toContain('mcp__agent-platform-mcp__codex_session_ensure')
     expect(analyzerContent).not.toContain('{{MCP_SEARCH_TOOL}}')
   })
 })
